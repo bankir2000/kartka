@@ -308,6 +308,10 @@
             </div>
             <button class="cache-start-btn" id="cacheStartBtn">⬇️ Почати завантаження</button>
             <button class="cache-close-btn" id="cacheCloseBtn">✕ Закрити</button>
+            <div style="margin-top:10px;text-align:center;">
+                <span id="cacheSizeInfo" style="color:#c4a747;font-size:12px;"></span>
+                <button id="cacheClearBtn" style="display:none;margin-left:10px;background:#7b0000;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;">🗑 Очистити кеш</button>
+            </div>
         </div>
     </div>
 
@@ -593,13 +597,22 @@ function initMap() {
         maxZoom: 18
     }).addTo(mainMap);
 
-    // Реєструємо Service Worker для кешування тайлів
+    // Реєструємо Service Worker — визначаємо scope автоматично
     if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').then(reg => {
-            console.log('SW зареєстровано:', reg.scope);
+        // Визначаємо базовий шлях (для GitHub Pages: /kartka/, для localhost: /)
+        const swPath = new URL('sw.js', window.location.href).pathname;
+        navigator.serviceWorker.register(swPath).then(reg => {
+            console.log('✅ SW зареєстровано:', reg.scope);
+            setStatus('✅ Service Worker активний — кешування працює');
+            setTimeout(() => setStatus(''), 3000);
         }).catch(err => {
-            console.log('SW не зареєстровано (локальний файл?):', err);
+            console.warn('⚠️ SW не зареєстровано:', err);
         });
+
+        // Показуємо статус онлайн/офлайн
+        window.addEventListener('online',  () => setStatus('🌐 Онлайн'));
+        window.addEventListener('offline', () => setStatus('🔒 Офлайн — карта з кешу'));
+        if (!navigator.onLine) setStatus('🔒 Офлайн — карта з кешу');
     }
 }
 
@@ -1155,14 +1168,40 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
 });
 
-document.getElementById('cacheBtn').addEventListener('click', () => {
+document.getElementById('cacheBtn').addEventListener('click', async () => {
     document.getElementById('cacheModalOverlay').classList.add('open');
     document.getElementById('cacheProgress').style.display = 'none';
     document.getElementById('cacheStartBtn').disabled = false;
     document.getElementById('cacheStartBtn').textContent = '⬇️ Почати завантаження';
+
+    // Показуємо кількість тайлів у кеші
+    const sizeEl = document.getElementById('cacheSizeInfo');
+    const clearBtn = document.getElementById('cacheClearBtn');
+    if ('caches' in window) {
+        try {
+            const cache = await caches.open('kartka-vognyu-tiles-v1');
+            const keys = await cache.keys();
+            if (keys.length > 0) {
+                sizeEl.textContent = `💾 В кеші: ${keys.length} тайлів`;
+                clearBtn.style.display = 'inline-block';
+            } else {
+                sizeEl.textContent = 'Кеш порожній';
+                clearBtn.style.display = 'none';
+            }
+        } catch(e) { sizeEl.textContent = ''; }
+    } else {
+        sizeEl.textContent = '⚠️ Cache API недоступний (потрібен HTTPS або localhost)';
+        clearBtn.style.display = 'none';
+    }
 });
 document.getElementById('cacheCloseBtn').addEventListener('click', () => {
     document.getElementById('cacheModalOverlay').classList.remove('open');
+});
+document.getElementById('cacheClearBtn').addEventListener('click', async () => {
+    if (!confirm('Видалити всі кешовані тайли?\nПісля цього потрібен інтернет для перегляду карти.')) return;
+    await caches.delete('kartka-vognyu-tiles-v1');
+    document.getElementById('cacheSizeInfo').textContent = 'Кеш очищено ✅';
+    document.getElementById('cacheClearBtn').style.display = 'none';
 });
 document.getElementById('cacheModalOverlay').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
