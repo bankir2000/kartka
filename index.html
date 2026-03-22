@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Картка вогню - Азимутна сітка 1-4 км</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #2c3e2f;
+            padding: 20px;
+            padding-bottom: 70px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: 'Segoe UI', monospace;
+        }
+        .control-panel {
+            background: #1e2a1c;
+            padding: 15px 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .coord-group { flex: 2; min-width: 280px; }
+        .name-group { flex: 1; min-width: 200px; }
+        .zones-panel {
+            background: #1e2a1c;
+            padding: 12px 25px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .zones-panel label { color: #f0e6c5; font-size: 12px; font-weight: bold; display: block; margin-bottom: 8px; }
+        .zone-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .zone-row input {
+            width: 110px; background: #fff0f0; border: 2px solid #c0392b;
+            padding: 7px 10px; font-family: monospace; font-size: 13px; font-weight: bold;
+            border-radius: 6px; color: #c0392b;
+        }
+        .zone-row span { color: #f0e6c5; font-size: 13px; }
+        .zone-remove { background: #c0392b; color: #fff; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .zone-remove:hover { background: #e74c3c; }
+        .add-zone-btn { background: #c0392b; color: #fff; border: none; padding: 7px 16px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; margin-top: 4px; }
+        .add-zone-btn:hover { background: #e74c3c; }
+        .orientirs-panel {
+            background: #1e2a1c;
+            padding: 12px 25px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .orientirs-panel > label { color: #f0e6c5; font-size: 12px; font-weight: bold; display: block; margin-bottom: 8px; }
+        .or-row { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+        .or-row .or-label { color: #f0e6c5; font-size: 13px; font-weight: bold; min-width: 38px; }
+        .or-row input {
+            flex: 1; background: #e8f5e9; border: 2px solid #27ae60;
+            padding: 7px 10px; font-family: monospace; font-size: 13px; font-weight: bold;
+            border-radius: 6px; color: #1a5c33;
+        }
+        .or-remove { background: #27ae60; color: #fff; border: none; border-radius: 5px; padding: 5px 10px; cursor: pointer; font-size: 13px; font-weight: bold; }
+        .or-remove:hover { background: #2ecc71; }
+        .add-or-btn { background: #27ae60; color: #fff; border: none; padding: 7px 16px; border-radius: 7px; font-weight: bold; cursor: pointer; font-size: 13px; margin-top: 4px; }
+        .add-or-btn:hover { background: #2ecc71; }
+        .coord-group label { display: block; color: #f0e6c5; font-size: 12px; font-weight: bold; margin-bottom: 5px; }
+        .coord-group input {
+            width: 100%; background: #fef9e6; border: 2px solid #c4a747;
+            padding: 10px 14px; font-family: monospace; font-size: 14px; font-weight: bold; border-radius: 8px;
+        }
+        button {
+            background: #c4a747; border: none; padding: 10px 24px;
+            border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px;
+        }
+        button:hover { background: #dbb85c; }
+        .pdf-btn { background: #8b5a2b; color: white; }
+        .coord-status {
+            background: #e8e0c5; padding: 8px 20px; font-family: monospace;
+            font-size: 13px; border-radius: 10px; margin-bottom: 15px;
+            width: 100%; max-width: 1000px; text-align: center;
+        }
+        .map-container {
+            position: relative; height: 550px; width: 100%;
+            max-width: 1000px; background: #cdd5c2;
+            border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        #map { height: 100%; width: 100%; }
+        #statusMsg {
+            margin-top: 10px; color: #f0e6c5; font-size: 13px;
+            min-height: 22px; text-align: center; width: 100%; max-width: 1000px;
+        }
+        /* Заголовок сайту */
+        .site-header {
+            width: 100%; max-width: 1000px;
+            text-align: center;
+            margin-bottom: 18px;
+        }
+        .site-title {
+            color: #f0e6c5;
+            font-size: 26px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+        .settings-btn {
+            margin-top: 10px;
+            background: #3a5a3a;
+            color: #f0e6c5;
+            border: 2px solid #6a8f6a;
+            padding: 8px 22px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+        }
+        .settings-btn:hover { background: #4a7a4a; }
+        /* Модальне вікно */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.open { display: flex; }
+        .modal {
+            background: #1e2a1c;
+            border-radius: 14px;
+            padding: 28px 32px;
+            width: 90%; max-width: 420px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .modal h2 {
+            color: #f0e6c5; font-size: 17px;
+            margin-bottom: 20px; text-align: center;
+            letter-spacing: 1px;
+        }
+        .modal label {
+            display: block; color: #c4a747;
+            font-size: 12px; font-weight: bold;
+            margin-bottom: 5px; margin-top: 14px;
+        }
+        .modal input {
+            width: 100%; background: #fef9e6;
+            border: 2px solid #c4a747;
+            padding: 9px 12px; font-size: 14px;
+            font-weight: bold; border-radius: 7px;
+            font-family: monospace;
+        }
+        .modal-btns {
+            display: flex; gap: 10px;
+            margin-top: 22px;
+        }
+        .modal-save {
+            flex: 1; background: #c4a747;
+            color: #1e2a1c; border: none;
+            padding: 10px; border-radius: 8px;
+            font-weight: bold; font-size: 14px;
+            cursor: pointer;
+        }
+        .modal-save:hover { background: #dbb85c; }
+        .modal-cancel {
+            flex: 1; background: #3a5a3a;
+            color: #f0e6c5; border: 2px solid #6a8f6a;
+            padding: 10px; border-radius: 8px;
+            font-weight: bold; font-size: 14px;
+            cursor: pointer;
+        }
+        .modal-cancel:hover { background: #4a7a4a; }
+    </style>
+</head>
+<body>
+    <!-- Заголовок та налаштування -->
+    <div class="site-header">
+        <div class="site-title">🗺 Картка вогню</div>
+        <button class="settings-btn" id="settingsBtn">⚙️ Налаштування реквізитів</button>
+    </div>
+
+    <!-- Модальне вікно реквізитів -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2>⚙️ Реквізити командира установки</h2>
+            <label>Звання командира установки:</label>
+            <input type="text" id="cmdRankInput" placeholder="Наприклад: Старший лейтенант">
+            <label>ПІБ командира установки:</label>
+            <input type="text" id="cmdNameInput" placeholder="Наприклад: Іваненко І.І.">
+            <div class="modal-btns">
+                <button class="modal-save" id="modalSave">💾 Зберегти</button>
+                <button class="modal-cancel" id="modalCancel">✕ Закрити</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="control-panel">
+        <div class="coord-group">
+            <label>🎯 КООРДИНАТИ ЦЕНТРУ (широта, довгота):</label>
+            <input type="text" id="coordInput" value="" placeholder="Приклад: 50.123456, 36.123456">
+        </div>
+        <div class="name-group">
+            <label style="display:block;color:#f0e6c5;font-size:12px;font-weight:bold;margin-bottom:5px;">📌 НАЗВА ПОЗИЦІЇ:</label>
+            <input type="text" id="nameInput" value="" placeholder="Наприклад: ЗВП-1" style="width:100%;background:#fef9e6;border:2px solid #c4a747;padding:10px 14px;font-family:monospace;font-size:14px;font-weight:bold;border-radius:8px;">
+        </div>
+    </div>
+    <div class="orientirs-panel">
+        <label>🟢 ОРІЄНТИРИ (координати точки):</label>
+        <div id="orientirsList">
+            <div class="or-row">
+                <span class="or-label">Ор.1</span>
+                <input type="text" class="or-input" placeholder="Приклад :50.654321, 36.654321">
+            </div>
+        </div>
+        <button class="add-or-btn" id="addOrBtn">+ Додати орієнтир</button>
+    </div>
+    <div class="zones-panel">
+        <label>🔴 ЧЕРВОНІ ЗОНИ (діапазон градусів від-до, наприклад: 0-30):</label>
+        <div id="zonesList">
+            <div class="zone-row">
+                <input type="text" class="zone-input" placeholder="0-30">
+                <span>градусів</span>
+            </div>
+        </div>
+        <button class="add-zone-btn" id="addZoneBtn">+ Додати зону</button>
+    </div>
+    <div style="position:fixed;bottom:0;left:0;right:0;display:flex;gap:0;z-index:9999;box-shadow:0 -3px 12px rgba(0,0,0,0.4);">
+        <button id="applyBtn" style="flex:1;font-size:15px;padding:15px 0;border-radius:0;background:#c4a747;font-weight:bold;border:none;cursor:pointer;">🏹 ПОБУДУВАТИ АЗИМУТНУ СІТКУ</button>
+        <button id="pdfBtn" class="pdf-btn" style="flex:1;font-size:15px;padding:15px 0;border-radius:0;background:#8b5a2b;color:white;font-weight:bold;border:none;cursor:pointer;">📄 ЗБЕРЕГТИ PDF</button>
+    </div>
+    <div class="coord-status">
+        <span>📍 Центр: <strong id="coordStatus">—</strong></span>
+        <span style="margin-left: 25px;">━━━ Кола: 1, 2, 3, 4 км &nbsp;|&nbsp; ─── Радіальні лінії через 3°</span>
+    </div>
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+    <div id="statusMsg"></div>
+
+<script>
+let mainMap, mainOverlay = null, currentCenter = null;
+
+function setStatus(msg) { document.getElementById('statusMsg').textContent = msg; }
+
+function parseCoords(str) {
+    // Нормалізуємо формат: 50,1091235, 36,0852673 → 50.1091235, 36.0852673
+    // Замінюємо кому між цифрами (десятковий роздільник) на крапку
+    let s = str.trim().replace(/(\d),(\d)/g, '$1.$2');
+    let parts = s.split(/[\s,;]+/).filter(p => p.length > 0);
+    let lat = parseFloat(parts[0]), lng = parseFloat(parts[1]);
+    if (isNaN(lat) || isNaN(lng)) return null;
+    return { lat, lng };
+}
+
+function getPoint(lat, lng, az, meters) {
+    let d = turf.destination(turf.point([lng, lat]), meters / 1000, az, { units: 'kilometers' });
+    return { lat: d.geometry.coordinates[1], lng: d.geometry.coordinates[0] };
+}
+
+function getRedZones() {
+    const zones = [];
+    document.querySelectorAll('.zone-input').forEach(inp => {
+        const val = inp.value.trim();
+        if (!val) return;
+        const parts = val.split(/[-–—]/);
+        if (parts.length < 2) return;
+        const from = parseFloat(parts[0]), to = parseFloat(parts[1]);
+        if (!isNaN(from) && !isNaN(to)) zones.push({ from, to });
+    });
+    return zones;
+}
+
+document.getElementById('addZoneBtn').addEventListener('click', () => {
+    const row = document.createElement('div');
+    row.className = 'zone-row';
+    row.innerHTML = `<input type="text" class="zone-input" placeholder="0-30"><span>градусів</span><button class="zone-remove">✕</button>`;
+    row.querySelector('.zone-remove').addEventListener('click', () => row.remove());
+    document.getElementById('zonesList').appendChild(row);
+});
+
+function getOrientirs() {
+    const list = [];
+    document.querySelectorAll('.or-input').forEach((inp, i) => {
+        const val = inp.value.trim().replace(/(\d),(\d)/g, '$1.$2');
+        if (!val) return;
+        const coords = parseCoords(val);
+        if (coords) list.push({ num: i + 1, lat: coords.lat, lng: coords.lng });
+    });
+    return list;
+}
+
+document.getElementById('addOrBtn').addEventListener('click', () => {
+    const rows = document.querySelectorAll('.or-row');
+    const num = rows.length + 1;
+    const row = document.createElement('div');
+    row.className = 'or-row';
+    row.innerHTML = `<span class="or-label">Ор.${num}</span><input type="text" class="or-input" placeholder="50.136125, 36.123321"><button class="or-remove">✕</button>`;
+    row.querySelector('.or-remove').addEventListener('click', () => {
+        row.remove();
+        // Перенумеровуємо
+        document.querySelectorAll('.or-row .or-label').forEach((lbl, i) => { lbl.textContent = `Ор.${i + 1}`; });
+    });
+    document.getElementById('orientirsList').appendChild(row);
+});
+
+function drawGrid(mapInstance, oldLayer, lat, lng, posName, redZones, orientirs) {
+    if (oldLayer) mapInstance.removeLayer(oldLayer);
+    const g = L.layerGroup();
+    const N = 180, R = 4000;
+
+    // ── Червоні зони (штрихування) ──
+    if (redZones && redZones.length > 0) {
+        redZones.forEach(({ from, to }) => {
+            // Малюємо лінії штрихування через кожні 5° в секторі
+            const step = 5;
+            let a = from;
+            while (a <= to) {
+                const e = getPoint(lat, lng, a, R);
+                L.polyline([[lat, lng], [e.lat, e.lng]], {
+                    color: '#e00', weight: 1.2, opacity: 0.55
+                }).addTo(g);
+                a += step;
+            }
+            // Межові лінії сектору — темно-бордові, трохи тонші за відповідальний сектор
+            const ef = getPoint(lat, lng, from, R);
+            const et = getPoint(lat, lng, to, R);
+            L.polyline([[lat, lng], [ef.lat, ef.lng]], { color: '#7b0000', weight: 2.5, opacity: 1 }).addTo(g);
+            L.polyline([[lat, lng], [et.lat, et.lng]], { color: '#7b0000', weight: 2.5, opacity: 1 }).addTo(g);
+            // Дуга по зовнішньому колу сектору
+            const arcPts = [];
+            for (let i = from; i <= to; i += 2) {
+                const p = getPoint(lat, lng, i, R);
+                arcPts.push([p.lat, p.lng]);
+            }
+            const pTo = getPoint(lat, lng, to, R);
+            arcPts.push([pTo.lat, pTo.lng]);
+            L.polyline(arcPts, { color: '#c00', weight: 2, opacity: 0.9 }).addTo(g);
+        });
+    }
+    const oc = [];
+    for (let i = 0; i <= N; i++) { const p = getPoint(lat, lng, i * 360 / N, R); oc.push([p.lat, p.lng]); }
+    L.polyline(oc, { color: '#000', weight: 2.5, dashArray: '8,6' }).addTo(g);
+
+    [1000, 2000, 3000].forEach(r => {
+        const c = [];
+        for (let i = 0; i <= N; i++) { const p = getPoint(lat, lng, i * 360 / N, r); c.push([p.lat, p.lng]); }
+        L.polyline(c, { color: '#000', weight: r === 2000 ? 3.5 : 1.5 }).addTo(g);
+    });
+
+    for (let az = 0; az < 360; az += 3) {
+        if (az % 30 === 0) continue;
+        const e = getPoint(lat, lng, az, R);
+        L.polyline([[lat, lng], [e.lat, e.lng]], { color: '#333', weight: 0.7, opacity: 0.6 }).addTo(g);
+    }
+
+    [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].forEach(az => {
+        const e = getPoint(lat, lng, az, R);
+        L.polyline([[lat, lng], [e.lat, e.lng]], { color: '#000', weight: az % 90 === 0 ? 2.5 : 1.5 }).addTo(g);
+    });
+
+    [{ az: 0, deg: '0°', mil: '00-00', num: '1' }, { az: 30, deg: '30°', mil: '05-00' },
+     { az: 60, deg: '60°', mil: '10-00' }, { az: 90, deg: '90°', mil: '15-00', num: '4' },
+     { az: 120, deg: '120°', mil: '20-00' }, { az: 150, deg: '150°', mil: '25-00' },
+     { az: 180, deg: '180°', mil: '30-00', num: '3' }, { az: 210, deg: '210°', mil: '35-00' },
+     { az: 240, deg: '240°', mil: '40-00' }, { az: 270, deg: '270°', mil: '45-00', num: '2' },
+     { az: 300, deg: '300°', mil: '50-00' }, { az: 330, deg: '330°', mil: '55-00' }
+    ].forEach(({ az, deg, mil, num }) => {
+        const lp = getPoint(lat, lng, az, R + 200), ic = az % 90 === 0;
+        L.marker([lp.lat, lp.lng], {
+            interactive: false, icon: L.divIcon({
+                className: '',
+                html: `<div style="font-family:Arial,sans-serif;text-align:center;font-weight:bold;font-size:10px;line-height:1.3;color:#000;white-space:nowrap"><u style="font-size:11px">${deg}</u><br><u>${mil}</u>${ic && num ? `<br><span style="font-size:14px">${num}</span>` : ''}</div>`,
+                iconSize: [60, ic ? 54 : 38], iconAnchor: [30, ic ? 27 : 19]
+            })
+        }).addTo(g);
+    });
+
+    [{ az: 45, n: '14' }, { az: 135, n: '34' }, { az: 225, n: '32' }, { az: 315, n: '12' }].forEach(({ az, n }) => {
+        const lp = getPoint(lat, lng, az, 2600);
+        L.marker([lp.lat, lp.lng], {
+            interactive: false, icon: L.divIcon({
+                className: '',
+                html: `<b style="font-family:Arial,sans-serif;font-size:22px;color:#000">${n}</b>`,
+                iconSize: [40, 30], iconAnchor: [20, 15]
+            })
+        }).addTo(g);
+    });
+
+    // Символ центру — іконка ЗРК з іконки
+    const svgIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
+      <!-- Блакитне коло-фон -->
+      <circle cx="18" cy="18" r="15" fill="#87DCEF"/>
+      <!-- Пунктирне обведення кола -->
+      <circle cx="18" cy="18" r="16.5" fill="none" stroke="#1a2535" stroke-width="2.5" stroke-dasharray="4.5,3"/>
+      <!-- Вертикальна лінія вгору -->
+      <line x1="18" y1="27" x2="18" y2="7" stroke="#1a2535" stroke-width="2" stroke-linecap="round"/>
+      <!-- Стрілка вгору -->
+      <line x1="12" y1="13" x2="18" y2="6" stroke="#1a2535" stroke-width="2" stroke-linecap="round"/>
+      <line x1="24" y1="13" x2="18" y2="6" stroke="#1a2535" stroke-width="2" stroke-linecap="round"/>
+      <!-- Перекладина 1 -->
+      <line x1="10" y1="19" x2="26" y2="19" stroke="#1a2535" stroke-width="2" stroke-linecap="round"/>
+      <!-- Перекладина 2 -->
+      <line x1="10" y1="25" x2="26" y2="25" stroke="#1a2535" stroke-width="2" stroke-linecap="round"/>
+      <!-- Платформа -->
+      <line x1="4" y1="33" x2="32" y2="33" stroke="#666" stroke-width="3" stroke-linecap="round"/>
+      <!-- Колесо ліве -->
+      <circle cx="8"  cy="38" r="4" fill="none" stroke="#666" stroke-width="2"/>
+      <circle cx="8"  cy="38" r="1.5" fill="#666"/>
+      <!-- Колесо праве -->
+      <circle cx="28" cy="38" r="4" fill="none" stroke="#666" stroke-width="2"/>
+      <circle cx="28" cy="38" r="1.5" fill="#666"/>
+    </svg>`;
+    L.marker([lat, lng], {
+        interactive: false, icon: L.divIcon({
+            className: '',
+            html: svgIcon,
+            iconSize: [36, 44], iconAnchor: [18, 33]
+        })
+    }).addTo(g);
+
+    // Назва позиції під центром
+    if (posName && posName.trim()) {
+        const namePoint = getPoint(lat, lng, 180, 280);
+        L.marker([namePoint.lat, namePoint.lng], {
+            interactive: false, icon: L.divIcon({
+                className: '',
+                html: `<div style="font-family:Arial,sans-serif;font-size:13px;font-weight:bold;color:#000;white-space:nowrap;text-align:center;text-shadow:1px 1px 2px #fff,-1px -1px 2px #fff,1px -1px 2px #fff,-1px 1px 2px #fff;">${posName}</div>`,
+                iconSize: [120, 20], iconAnchor: [60, 0]
+            })
+        }).addTo(g);
+    }
+
+    // Орієнтири
+    if (orientirs && orientirs.length > 0) {
+        orientirs.forEach(({ num, lat: oLat, lng: oLng }) => {
+            // Відстань від центру до орієнтиру в гм (1 гм = 100м)
+            const distM = turf.distance(turf.point([lng, lat]), turf.point([oLng, oLat]), { units: 'kilometers' }) * 1000;
+            const distGm = (distM / 100).toFixed(1);
+            L.marker([oLat, oLng], {
+                interactive: false, icon: L.divIcon({
+                    className: '',
+                    html: `<div style="font-family:Arial,sans-serif;font-size:11px;font-weight:bold;color:#1a5c33;white-space:nowrap;text-align:center;text-shadow:1px 1px 2px #fff,-1px -1px 2px #fff,1px -1px 2px #fff,-1px 1px 2px #fff;">
+                        <div style="font-size:15px;">▲</div>
+                        <div style="border-bottom:1.5px solid #1a5c33;padding-bottom:1px;">Ор.${num}</div>
+                        <div>${distGm}</div>
+                    </div>`,
+                    iconSize: [50, 50], iconAnchor: [25, 38]
+                })
+            }).addTo(g);
+        });
+    }
+
+    g.addTo(mapInstance);
+    return g;
+}
+
+function initMap() {
+    mainMap = L.map('map', { preferCanvas: true }).setView([48.5, 31.0], 6);
+    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap', maxZoom: 18 }).addTo(mainMap);
+}
+
+function updateGrid() {
+    const coords = parseCoords(document.getElementById('coordInput').value);
+    if (!coords) { alert('Помилка! Введіть координати у форматі: 50.136125, 36.123321'); return false; }
+    currentCenter = coords;
+    const posName = document.getElementById('nameInput').value.trim();
+    const redZones = getRedZones();
+    const orientirs = getOrientirs();
+    mainMap.setView([coords.lat, coords.lng], 12);
+    mainOverlay = drawGrid(mainMap, mainOverlay, coords.lat, coords.lng, posName, redZones, orientirs);
+    document.getElementById('coordStatus').innerHTML = `${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}`;
+    return true;
+}
+
+const mercY = lat => Math.log(Math.tan((90 + lat) * Math.PI / 360));
+
+function ll2tile(lat, lng, z) {
+    const n = 2 ** z;
+    return { x: Math.floor((lng + 180) / 360 * n), y: Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n) };
+}
+function tile2ll(x, y, z) {
+    const n = 2 ** z;
+    return { lat: Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI, lng: x / n * 360 - 180 };
+}
+async function fetchTile(url) {
+    try {
+        const r = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(8000) });
+        if (!r.ok) return null;
+        const blob = await r.blob();
+        return new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = () => res(null); fr.readAsDataURL(blob); });
+    } catch { return null; }
+}
+
+async function exportPDF() {
+    if (!currentCenter) { alert('Спочатку введіть координати та натисніть «ПОБУДУВАТИ АЗИМУТНУ СІТКУ»'); return; }
+    const btn = document.getElementById('pdfBtn');
+    btn.innerText = '⏳ Генерація PDF...'; btn.disabled = true;
+    setStatus('⏳ Завантаження тайлів карти...');
+
+    try {
+        const { lat, lng } = currentCenter;
+        const zoom = 12;
+
+        const edgeM = 4700;
+        const dLat = edgeM / 110540;
+        const dLng = edgeM / (111320 * Math.cos(lat * Math.PI / 180));
+        const MN = lat + dLat, MS = lat - dLat, MW = lng - dLng, ME = lng + dLng;
+
+        const nwT = ll2tile(MN, MW, zoom), seT = ll2tile(MS, ME, zoom);
+        const TILE = 256;
+        const jobs = [];
+        for (let tx = nwT.x; tx <= seT.x; tx++)
+            for (let ty = nwT.y; ty <= seT.y; ty++) {
+                const sub = ['a', 'b', 'c'][Math.abs(tx + ty) % 3];
+                jobs.push(fetchTile(`https://${sub}.tile.opentopomap.org/${zoom}/${tx}/${ty}.png`).then(b => ({ tx, ty, b })));
+            }
+        const tiles = await Promise.all(jobs);
+
+        const txs = seT.x - nwT.x + 1, tys = seT.y - nwT.y + 1;
+        const fc = document.createElement('canvas'); fc.width = txs * TILE; fc.height = tys * TILE;
+        const fctx = fc.getContext('2d'); fctx.fillStyle = '#d8d8c0'; fctx.fillRect(0, 0, fc.width, fc.height);
+        await Promise.all(tiles.map(({ tx, ty, b }) => new Promise(res => {
+            if (!b) { res(); return; }
+            const img = new Image();
+            img.onload = () => { fctx.drawImage(img, (tx - nwT.x) * TILE, (ty - nwT.y) * TILE); res(); };
+            img.onerror = () => res(); img.src = b;
+        })));
+
+        const nwLL = tile2ll(nwT.x, nwT.y, zoom), seLL = tile2ll(seT.x + 1, seT.y + 1, zoom);
+        const ll2px = (clat, clng) => ({
+            cx: (clng - nwLL.lng) / (seLL.lng - nwLL.lng) * fc.width,
+            cy: (mercY(nwLL.lat) - mercY(clat)) / (mercY(nwLL.lat) - mercY(seLL.lat)) * fc.height
+        });
+        const nwPx = ll2px(MN, MW), sePx = ll2px(MS, ME);
+        const cw = Math.max(1, Math.round(sePx.cx - nwPx.cx)), ch = Math.max(1, Math.round(sePx.cy - nwPx.cy));
+        const cc = document.createElement('canvas'); cc.width = cw; cc.height = ch;
+        cc.getContext('2d').drawImage(fc, nwPx.cx, nwPx.cy, cw, ch, 0, 0, cw, ch);
+        const mapJpeg = cc.toDataURL('image/jpeg', 0.92);
+
+        setStatus('⏳ Побудова PDF...');
+
+        const { jsPDF } = window.jspdf;
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const PW = 210, PH = 297, M = 8;
+        const SC = 4;
+
+        // ── Шапка ──
+        // Макет як на скріні:
+        // Рядок 1: КАРТКА ВОГНЮ — по центру
+        // Рядок 2: «ЗАТВЕРДЖУЮ» — по центру правої половини
+        // Рядок 3: Командир ___ — по центру правої половини
+        // Рядок 4: риска + (військове звання...) — по центру правої половини
+        // Рядок 5: «___» ___ 20___ р. — по центру правої половини
+        const hH = 46 * SC;
+        const hW = Math.round((PW - M * 2) * SC);
+        const hc = document.createElement('canvas'); hc.width = hW; hc.height = hH;
+        const hx = hc.getContext('2d');
+        hx.fillStyle = '#fff'; hx.fillRect(0, 0, hW, hH); hx.fillStyle = '#000';
+
+        // Центр правої половини
+        const rightCx = hW * 0.72;
+
+        // Рядок 1: КАРТКА ВОГНЮ — по центру сторінки
+        hx.font = `bold ${6.5 * SC}px Arial`; hx.textAlign = 'center';
+        hx.fillText('КАРТКА ВОГНЮ', hW / 2, 8 * SC);
+
+        // Рядок 2: «ЗАТВЕРДЖУЮ»
+        hx.font = `bold ${4 * SC}px Arial`; hx.textAlign = 'center';
+        hx.fillText('«ЗАТВЕРДЖУЮ»', rightCx, 15 * SC);
+
+        // Рядок 3: Командир + риска
+        hx.font = `${3.8 * SC}px Arial`; hx.textAlign = 'left';
+        const cmdX = hW * 0.47;
+        hx.fillText('Командир', cmdX, 22 * SC);
+        // риска після слова
+        hx.beginPath();
+        hx.moveTo(cmdX + 24 * SC, 22.5 * SC);
+        hx.lineTo(hW * 0.97, 22.5 * SC);
+        hx.lineWidth = 0.8; hx.strokeStyle = '#000'; hx.stroke();
+
+        // Рядок 4: риска (довга) + (військове звання...)
+        hx.beginPath();
+        hx.moveTo(cmdX, 29 * SC);
+        hx.lineTo(hW * 0.97, 29 * SC);
+        hx.lineWidth = 0.8; hx.stroke();
+        hx.font = `${2.5 * SC}px Arial`; hx.textAlign = 'center';
+        hx.fillText('(військове звання, підпис, ініціали та прізвище)', rightCx, 32 * SC);
+
+        // Рядок 5: «___» ___ 20___ р.
+        hx.font = `${3.8 * SC}px Arial`; hx.textAlign = 'left';
+        hx.fillText('«___»', cmdX, 40 * SC);
+        hx.beginPath();
+        hx.moveTo(cmdX + 14 * SC, 40.5 * SC);
+        hx.lineTo(cmdX + 50 * SC, 40.5 * SC);
+        hx.lineWidth = 0.8; hx.stroke();
+        hx.fillText('20', cmdX + 52 * SC, 40 * SC);
+        hx.beginPath();
+        hx.moveTo(cmdX + 60 * SC, 40.5 * SC);
+        hx.lineTo(cmdX + 76 * SC, 40.5 * SC);
+        hx.lineWidth = 0.8; hx.stroke();
+        hx.fillText('р.', cmdX + 78 * SC, 40 * SC);
+
+        pdf.addImage(hc.toDataURL('image/png'), 'PNG', M, M, PW - M * 2, 46);
+
+        // ── Карта ──
+        const mapX = M, mapY = M + 48;
+        const mapW = PW - M * 2, mapH = mapW * (ch / cw);
+        pdf.addImage(mapJpeg, 'JPEG', mapX, mapY, mapW, mapH);
+
+        // ── Сітка ──
+        const c2mm = (clat, clng) => ({
+            px: (clng - MW) / (ME - MW) * mapW + mapX,
+            py: (mercY(MN) - mercY(clat)) / (mercY(MN) - mercY(MS)) * mapH + mapY
+        });
+        const gp = (az, m) => { const p = getPoint(lat, lng, az, m); return c2mm(p.lat, p.lng); };
+        const ctr = c2mm(lat, lng);
+        const NP = 120;
+
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.35);
+        for (let i = 0; i < NP; i += 2) { const p1 = gp(i * 360 / NP, 4000), p2 = gp((i + 1) * 360 / NP, 4000); pdf.line(p1.px, p1.py, p2.px, p2.py); }
+        pdf.setLineWidth(0.22);
+        for (let i = 0; i < NP; i++) { const p1 = gp(i * 360 / NP, 3000), p2 = gp((i + 1) * 360 / NP, 3000); pdf.line(p1.px, p1.py, p2.px, p2.py); }
+        pdf.setLineWidth(0.6);
+        for (let i = 0; i < NP; i++) { const p1 = gp(i * 360 / NP, 2000), p2 = gp((i + 1) * 360 / NP, 2000); pdf.line(p1.px, p1.py, p2.px, p2.py); }
+        for (let i = 0; i < NP; i++) { const p1 = gp(i * 360 / NP, 1000), p2 = gp((i + 1) * 360 / NP, 1000); pdf.line(p1.px, p1.py, p2.px, p2.py); }
+        pdf.setLineWidth(0.08); pdf.setDrawColor(50, 50, 50);
+        for (let a = 0; a < 360; a += 3) { if (a % 30 === 0) continue; const e = gp(a, 4000); pdf.line(ctr.px, ctr.py, e.px, e.py); }
+        [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330].forEach(a => {
+            pdf.setLineWidth(a % 90 === 0 ? 0.42 : 0.22); pdf.setDrawColor(0, 0, 0);
+            const e = gp(a, 4000); pdf.line(ctr.px, ctr.py, e.px, e.py);
+        });
+        // ── Червоні зони в PDF ──
+        const redZones = getRedZones();
+        if (redZones.length > 0) {
+            redZones.forEach(({ from, to }) => {
+                // Штрихувальні лінії через кожні 5°
+                const step = 5;
+                let a = from;
+                while (a <= to) {
+                    const e = gp(a, 4000);
+                    pdf.setDrawColor(220, 0, 0);
+                    pdf.setLineWidth(0.18);
+                    pdf.line(ctr.px, ctr.py, e.px, e.py);
+                    a += step;
+                }
+                // Межові лінії — темно-бордові, трохи тонші за відповідальний сектор
+                pdf.setDrawColor(123, 0, 0); pdf.setLineWidth(0.55);
+                const ef = gp(from, 4000); pdf.line(ctr.px, ctr.py, ef.px, ef.py);
+                const et = gp(to, 4000);   pdf.line(ctr.px, ctr.py, et.px, et.py);
+                // Дуга
+                const NParc = Math.max(2, Math.round(to - from));
+                for (let i = 0; i < NParc; i++) {
+                    const a1 = from + i * (to - from) / NParc;
+                    const a2 = from + (i + 1) * (to - from) / NParc;
+                    const p1 = gp(a1, 4000), p2 = gp(a2, 4000);
+                    pdf.line(p1.px, p1.py, p2.px, p2.py);
+                }
+            });
+            // Повертаємо колір
+            pdf.setDrawColor(0, 0, 0);
+        }
+
+        pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
+        [{ a: 0, d: '0\xb0', ml: '00-00', n: '1' }, { a: 30, d: '30\xb0', ml: '05-00' },
+         { a: 60, d: '60\xb0', ml: '10-00' }, { a: 90, d: '90\xb0', ml: '15-00', n: '4' },
+         { a: 120, d: '120\xb0', ml: '20-00' }, { a: 150, d: '150\xb0', ml: '25-00' },
+         { a: 180, d: '180\xb0', ml: '30-00', n: '3' }, { a: 210, d: '210\xb0', ml: '35-00' },
+         { a: 240, d: '240\xb0', ml: '40-00' }, { a: 270, d: '270\xb0', ml: '45-00', n: '2' },
+         { a: 300, d: '300\xb0', ml: '50-00' }, { a: 330, d: '330\xb0', ml: '55-00' }
+        ].forEach(({ a, d, ml, n }) => {
+            const lp = gp(a, 4550);
+            pdf.setFontSize(6); pdf.text(d, lp.px, lp.py - 1.5, { align: 'center' });
+            pdf.text(ml, lp.px, lp.py + 2.5, { align: 'center' });
+            if (n) { pdf.setFontSize(8.5); pdf.text(n, lp.px, lp.py + 8, { align: 'center' }); }
+            pdf.setFontSize(6);
+        });
+        pdf.setFontSize(10); pdf.setFont('helvetica', 'bold');
+        [{ a: 45, n: '14' }, { a: 135, n: '34' }, { a: 225, n: '32' }, { a: 315, n: '12' }].forEach(({ a, n }) => {
+            const lp = gp(a, 2600); pdf.text(n, lp.px, lp.py, { align: 'center' });
+        });
+        // Символ центру в PDF — іконка ЗРК
+        const cx = ctr.px, cy = ctr.py;
+        const s = 0.25; // мм/одиницю (36px SVG → ~9мм)
+
+        // Блакитне коло
+        pdf.setFillColor(135, 220, 239);
+        pdf.setDrawColor(135, 220, 239);
+        pdf.circle(cx, cy - 9*s, 15*s, 'F');
+
+        // Пунктирне обведення
+        pdf.setDrawColor(26, 37, 53); pdf.setLineWidth(0.3);
+        const rC = 16.5*s, nDash = 20;
+        for (let i = 0; i < nDash; i += 2) {
+            const a1 = i*2*Math.PI/nDash, a2 = (i+0.65)*2*Math.PI/nDash;
+            pdf.line(cx + rC*Math.sin(a1), (cy-9*s) - rC*Math.cos(a1),
+                     cx + rC*Math.sin(a2), (cy-9*s) - rC*Math.cos(a2));
+        }
+
+        // Вертикальна лінія вгору
+        pdf.setLineWidth(0.28);
+        pdf.line(cx, cy - 9*s + 9*s, cx, cy - 9*s - 11*s); // від низу до верху
+
+        // Стрілка
+        pdf.line(cx - 6*s, cy - 9*s - 5*s, cx, cy - 9*s - 12*s);
+        pdf.line(cx + 6*s, cy - 9*s - 5*s, cx, cy - 9*s - 12*s);
+
+        // Перекладина 1
+        pdf.line(cx - 8*s, cy - 9*s - 1*s, cx + 8*s, cy - 9*s - 1*s);
+
+        // Перекладина 2
+        pdf.line(cx - 8*s, cy - 9*s + 5*s, cx + 8*s, cy - 9*s + 5*s);
+
+        // Платформа
+        pdf.setDrawColor(100, 100, 100); pdf.setLineWidth(0.5);
+        pdf.line(cx - 14*s, cy + 6*s, cx + 14*s, cy + 6*s);
+
+        // Колеса
+        pdf.setLineWidth(0.25);
+        [-10, 10].forEach(dx => {
+            pdf.circle(cx + dx*s, cy + 10*s, 4*s, 'S');
+            pdf.setFillColor(100, 100, 100);
+            pdf.circle(cx + dx*s, cy + 10*s, 1.5*s, 'F');
+        });
+        pdf.setDrawColor(0,0,0); pdf.setFillColor(0,0,0);
+
+        // Назва позиції під центром (через canvas — кирилиця)
+        const posName = document.getElementById('nameInput').value.trim();
+        if (posName) {
+            const nSC = 8; // px/mm
+            const fontSize = 4.5 * nSC;
+            const fontStr = `bold ${fontSize}px Arial`;
+            // Вимірюємо точну ширину тексту
+            const measureC = document.createElement('canvas');
+            const measureCtx = measureC.getContext('2d');
+            measureCtx.font = fontStr;
+            const textW = measureCtx.measureText(posName).width;
+            const padH = 3 * nSC; // відступ по горизонталі
+            const padV = 2 * nSC; // відступ по вертикалі
+            const nW = textW + padH * 2;
+            const nH = fontSize + padV * 2;
+
+            const nCanvas = document.createElement('canvas');
+            nCanvas.width = Math.round(nW);
+            nCanvas.height = Math.round(nH);
+            const nctx = nCanvas.getContext('2d');
+            nctx.clearRect(0, 0, nCanvas.width, nCanvas.height);
+            nctx.font = fontStr;
+            nctx.fillStyle = '#000';
+            nctx.textAlign = 'center';
+            nctx.textBaseline = 'middle';
+            nctx.fillText(posName, nCanvas.width / 2, nCanvas.height / 2);
+
+            // Розміри в мм для PDF
+            const wMm = nCanvas.width / nSC;
+            const hMm = nCanvas.height / nSC;
+            pdf.addImage(nCanvas.toDataURL('image/png'), 'PNG',
+                ctr.px - wMm / 2, ctr.py + 4, wMm, hMm);
+        }
+        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.7);
+        pdf.rect(mapX, mapY, mapW, mapH);
+
+        // ── Орієнтири в PDF ──
+        const orientirs = getOrientirs();
+        if (orientirs.length > 0) {
+            orientirs.forEach(({ num, lat: oLat, lng: oLng }) => {
+                const op = c2mm(oLat, oLng);
+                // Відстань в гм
+                const distM = turf.distance(turf.point([lng, lat]), turf.point([oLng, oLat]), { units: 'kilometers' }) * 1000;
+                const distGm = (distM / 100).toFixed(1);
+
+                // Трикутник-маркер
+                pdf.setFillColor(26, 92, 51);
+                pdf.setDrawColor(26, 92, 51);
+                pdf.triangle(op.px, op.py - 4, op.px - 2.5, op.py, op.px + 2.5, op.py, 'F');
+
+                // Підпис через canvas (кирилиця: "Ор.N" / distGm)
+                const oSC = 8;
+                const label1 = `\u041e\u0440.${num}`; // Ор.N
+                const label2 = distGm;
+                const oFont = `bold ${3.5 * oSC}px Arial`;
+                const mc = document.createElement('canvas');
+                const mctx = mc.getContext('2d');
+                mctx.font = oFont;
+                const w1 = mctx.measureText(label1).width;
+                const w2 = mctx.measureText(label2).width;
+                const oW = Math.max(w1, w2) + 6 * oSC;
+                const oH = 10 * oSC;
+                const oc2 = document.createElement('canvas');
+                oc2.width = Math.round(oW); oc2.height = Math.round(oH);
+                const octx = oc2.getContext('2d');
+                octx.clearRect(0, 0, oc2.width, oc2.height);
+                octx.fillStyle = '#1a5c33';
+                octx.font = oFont;
+                octx.textAlign = 'center';
+                // Рядок 1: Ор.N
+                octx.fillText(label1, oc2.width / 2, 4 * oSC);
+                // Риска між чисельником і знаменником
+                octx.beginPath();
+                octx.moveTo(2, 5 * oSC); octx.lineTo(oc2.width - 2, 5 * oSC);
+                octx.strokeStyle = '#1a5c33'; octx.lineWidth = 0.5 * oSC; octx.stroke();
+                // Рядок 2: дальність
+                octx.fillText(label2, oc2.width / 2, 8.5 * oSC);
+
+                const oWmm = oc2.width / oSC, oHmm = oc2.height / oSC;
+                pdf.addImage(oc2.toDataURL('image/png'), 'PNG',
+                    op.px - oWmm / 2, op.py + 1, oWmm, oHmm);
+            });
+        }
+
+        // ── Підвал ──
+        const footerY = mapY + mapH + 3;
+        const footerMm = PH - footerY - 5;
+        const fW = Math.round((PW - M * 2) * SC), fH = Math.round(footerMm * SC);
+        const fcanv = document.createElement('canvas'); fcanv.width = fW; fcanv.height = fH;
+        const fx = fcanv.getContext('2d');
+        fx.fillStyle = '#fff'; fx.fillRect(0, 0, fW, fH); fx.fillStyle = '#000';
+
+        // Заголовок
+        fx.font = `bold ${3.8 * SC}px Arial`; fx.textAlign = 'center';
+        fx.fillText('Умовні позначення:', fW / 2, 4.5 * SC);
+
+        // Таблиця: 4 колонки (іконка | текст | іконка | текст)
+        // Ширини: 12% | 38% | 12% | 38%
+        const tY = 6 * SC, tRH = 10 * SC;
+        const col0 = 0, col1 = fW * 0.12, col2 = fW * 0.50, col3 = fW * 0.62;
+        fx.strokeStyle = '#000'; fx.lineWidth = 0.4 * SC;
+        // Зовнішній прямокутник
+        fx.strokeRect(col0, tY, fW, tRH * 2);
+        // Вертикальні лінії
+        fx.beginPath(); fx.moveTo(col1, tY); fx.lineTo(col1, tY + tRH * 2); fx.stroke();
+        fx.beginPath(); fx.moveTo(col2, tY); fx.lineTo(col2, tY + tRH * 2); fx.stroke();
+        fx.beginPath(); fx.moveTo(col3, tY); fx.lineTo(col3, tY + tRH * 2); fx.stroke();
+        // Горизонтальна лінія
+        fx.beginPath(); fx.moveTo(col0, tY + tRH); fx.lineTo(fW, tY + tRH); fx.stroke();
+
+        // Рядок 1, клітинка 1: дашована дуга (дальність поразки)
+        fx.save();
+        fx.strokeStyle = '#000'; fx.lineWidth = 1.2 * SC;
+        fx.setLineDash([2 * SC, 1.2 * SC]);
+        fx.beginPath();
+        fx.arc(col1 / 2, tY + tRH / 2, 3.5 * SC, Math.PI * 1.1, Math.PI * 1.9);
+        fx.stroke();
+        fx.restore();
+
+        // Рядок 1, клітинка 2: текст
+        fx.font = `bold ${3.2 * SC}px Arial`; fx.textAlign = 'left'; fx.fillStyle = '#000';
+        fx.fillText('Дальність поразки комплексу', col1 + 1.5 * SC, tY + tRH / 2 + 1.2 * SC);
+
+        // Рядок 1, клітинка 3: стрілки (відповідальний сектор) ← ↗ форма
+        fx.save();
+        fx.strokeStyle = '#000'; fx.lineWidth = 1.5 * SC;
+        const arCx = col2 + (col3 - col2) / 2, arCy = tY + tRH / 2;
+        const arW = (col3 - col2) * 0.35;
+        // ліва стрілка вліво-вниз
+        fx.beginPath(); fx.moveTo(arCx - arW, arCy - 2 * SC); fx.lineTo(arCx, arCy + 2 * SC); fx.stroke();
+        // права стрілка вправо-вниз
+        fx.beginPath(); fx.moveTo(arCx + arW, arCy - 2 * SC); fx.lineTo(arCx, arCy + 2 * SC); fx.stroke();
+        // наконечники стрілок
+        fx.fillStyle = '#000';
+        // ліва — стрілка вліво
+        fx.beginPath(); fx.moveTo(arCx - arW, arCy - 2 * SC); fx.lineTo(arCx - arW - 2 * SC, arCy - 2 * SC + 1.5 * SC); fx.lineTo(arCx - arW + 1.2 * SC, arCy - 2 * SC - 1.5 * SC); fx.closePath(); fx.fill();
+        // права — стрілка вправо
+        fx.beginPath(); fx.moveTo(arCx + arW, arCy - 2 * SC); fx.lineTo(arCx + arW + 2 * SC, arCy - 2 * SC + 1.5 * SC); fx.lineTo(arCx + arW - 1.2 * SC, arCy - 2 * SC - 1.5 * SC); fx.closePath(); fx.fill();
+        fx.restore();
+
+        // Рядок 1, клітинка 4: текст
+        fx.font = `bold ${3.2 * SC}px Arial`; fx.textAlign = 'left'; fx.fillStyle = '#000';
+        fx.fillText('Відповідальний сектор', col3 + 1.5 * SC, tY + tRH / 2 + 1.2 * SC);
+
+        // Рядок 2, клітинка 1: суцільна дуга (дальність прямого пострілу)
+        fx.save();
+        fx.strokeStyle = '#000'; fx.lineWidth = 1.8 * SC;
+        fx.beginPath();
+        fx.arc(col1 / 2, tY + tRH + tRH / 2, 3.5 * SC, Math.PI * 1.1, Math.PI * 1.9);
+        fx.stroke();
+        fx.restore();
+
+        // Рядок 2, клітинка 2: текст
+        fx.font = `bold ${3.2 * SC}px Arial`; fx.fillStyle = '#000'; fx.textAlign = 'left';
+        fx.fillText('Дальність прямого пострілу', col1 + 1.5 * SC, tY + tRH + tRH / 2 + 1.2 * SC);
+
+        // Рядок 2, клітинки 3+4: Ор.3/8 + пояснення
+        const orX = col2 + 2 * SC, orY2 = tY + tRH + 3.5 * SC;
+        fx.font = `bold ${3.5 * SC}px Arial`; fx.textAlign = 'left'; fx.fillStyle = '#000';
+        fx.fillText('Ор.3', orX, orY2);
+        fx.beginPath(); fx.moveTo(orX, orY2 + 0.8 * SC); fx.lineTo(orX + 11 * SC, orY2 + 0.8 * SC);
+        fx.lineWidth = 0.35 * SC; fx.stroke();
+        fx.fillText('8', orX + 3.5 * SC, orY2 + 6 * SC);
+        fx.font = `${3.0 * SC}px Arial`;
+        fx.fillText('В чисельнику – номер орієнтира, в', col3 + 1.5 * SC, tY + tRH + 3.5 * SC);
+        fx.fillText('знаменнику – дальність до орієнтира в гм', col3 + 1.5 * SC, tY + tRH + 7.5 * SC);
+
+        // Командир установки
+        const cmdY = tY + tRH * 2 + 6 * SC;
+        const cmdRank = getCmdRank();
+        const cmdName = getCmdName();
+
+        fx.font = `${3.5 * SC}px Arial`; fx.textAlign = 'left'; fx.fillStyle = '#000';
+        fx.fillText('Командир установки', 0, cmdY);
+
+        // Звання — підкреслений текст по ширині тексту
+        let curX = 49 * SC;
+        if (cmdRank) {
+            fx.font = `${3.5 * SC}px Arial`;
+            const rankW = fx.measureText(cmdRank).width;
+            fx.fillText(cmdRank, curX, cmdY);
+            fx.beginPath(); fx.moveTo(curX, cmdY + 0.8*SC); fx.lineTo(curX + rankW, cmdY + 0.8*SC);
+            fx.lineWidth = 0.35*SC; fx.stroke();
+            curX += rankW + 4*SC;
+        } else {
+            // Порожня риска для звання
+            fx.beginPath(); fx.moveTo(curX, cmdY + 0.8*SC); fx.lineTo(curX + 40*SC, cmdY + 0.8*SC);
+            fx.lineWidth = 0.35*SC; fx.stroke();
+            curX += 44*SC;
+        }
+
+        // Місце для підпису — фіксована риска
+        const signW = 25 * SC;
+        fx.beginPath(); fx.moveTo(curX, cmdY + 0.8*SC); fx.lineTo(curX + signW, cmdY + 0.8*SC);
+        fx.lineWidth = 0.35*SC; fx.stroke();
+        curX += signW + 4*SC;
+
+        // ПІБ — підкреслений текст по ширині тексту
+        if (cmdName) {
+            fx.font = `${3.5 * SC}px Arial`;
+            const nameW = fx.measureText(cmdName).width;
+            fx.fillText(cmdName, curX, cmdY);
+            fx.beginPath(); fx.moveTo(curX, cmdY + 0.8*SC); fx.lineTo(curX + nameW, cmdY + 0.8*SC);
+            fx.lineWidth = 0.35*SC; fx.stroke();
+        } else {
+            fx.beginPath(); fx.moveTo(curX, cmdY + 0.8*SC); fx.lineTo(fW, cmdY + 0.8*SC);
+            fx.lineWidth = 0.35*SC; fx.stroke();
+        }
+
+        // Підпис під рядком
+        fx.font = `${2.6 * SC}px Arial`; fx.fillStyle = '#000';
+        fx.textAlign = 'center';
+        fx.fillText('(військове звання, підпис, ініціали та прізвище)', fW / 2 - 30 * SC, cmdY + 5 * SC);
+
+        pdf.addImage(fcanv.toDataURL('image/png'), 'PNG', M, footerY, PW - M * 2, footerMm);
+
+        const clc = document.createElement('canvas'); clc.width = fW; clc.height = Math.round(5 * SC);
+        const clx = clc.getContext('2d'); clx.fillStyle = '#888';
+        clx.font = `${2 * SC}px Arial`; clx.textAlign = 'center';
+        clx.fillText(`Центр: ${lat.toFixed(6)}, ${lng.toFixed(6)}  |  ${new Date().toLocaleDateString('uk-UA')}`, fW / 2, 3.5 * SC);
+        pdf.addImage(clc.toDataURL('image/png'), 'PNG', M, PH - 6, PW - M * 2, 5);
+
+        const posNameFile = document.getElementById('nameInput').value.trim();
+        const fileName = posNameFile ? `Kartka_vognyu_${posNameFile}.pdf` : `Kartka_vognyu_${lat.toFixed(5)}_${lng.toFixed(5)}.pdf`;
+        pdf.save(fileName);
+        setStatus('✅ PDF збережено успішно!');
+        setTimeout(() => setStatus(''), 4000);
+
+    } catch (e) {
+        console.error(e); setStatus('❌ Помилка: ' + e.message); alert('Помилка: ' + e.message);
+    } finally {
+        btn.innerText = '📄 ЗБЕРЕГТИ PDF'; btn.disabled = false;
+    }
+}
+
+window.addEventListener('resize', () => { if (mainMap) setTimeout(() => mainMap.invalidateSize(), 150); });
+
+// ── Реквізити: localStorage ───────────────────────────────────────────────────
+function loadRequisites() {
+    document.getElementById('cmdRankInput').value = localStorage.getItem('cmdRank') || '';
+    document.getElementById('cmdNameInput').value = localStorage.getItem('cmdName') || '';
+}
+function saveRequisites() {
+    localStorage.setItem('cmdRank', document.getElementById('cmdRankInput').value.trim());
+    localStorage.setItem('cmdName', document.getElementById('cmdNameInput').value.trim());
+}
+function getCmdRank() { return localStorage.getItem('cmdRank') || ''; }
+function getCmdName() { return localStorage.getItem('cmdName') || ''; }
+
+document.getElementById('settingsBtn').addEventListener('click', () => {
+    loadRequisites();
+    document.getElementById('modalOverlay').classList.add('open');
+});
+document.getElementById('modalSave').addEventListener('click', () => {
+    const rank = document.getElementById('cmdRankInput').value.trim();
+    const name = document.getElementById('cmdNameInput').value.trim();
+    if (!rank) {
+        document.getElementById('cmdRankInput').style.border = '2px solid #c0392b';
+        document.getElementById('cmdRankInput').focus();
+        return;
+    }
+    if (!name) {
+        document.getElementById('cmdNameInput').style.border = '2px solid #c0392b';
+        document.getElementById('cmdNameInput').focus();
+        return;
+    }
+    saveRequisites();
+    document.getElementById('modalOverlay').classList.remove('open');
+});
+document.getElementById('modalCancel').addEventListener('click', () => {
+    document.getElementById('modalOverlay').classList.remove('open');
+});
+document.getElementById('cmdRankInput').addEventListener('input', function() {
+    this.style.border = '2px solid #c4a747';
+});
+document.getElementById('cmdNameInput').addEventListener('input', function() {
+    this.style.border = '2px solid #c4a747';
+});
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+});
+
+document.getElementById('coordInput').addEventListener('blur', function() {
+    this.value = this.value.replace(/(\d),(\d)/g, '$1.$2');
+});
+
+// Автовиправлення коми в полях орієнтирів при втраті фокусу
+document.getElementById('orientirsList').addEventListener('blur', function(e) {
+    if (e.target.classList.contains('or-input')) {
+        e.target.value = e.target.value.replace(/(\d),(\d)/g, '$1.$2');
+    }
+}, true);
+document.getElementById('applyBtn').addEventListener('click', updateGrid);
+document.getElementById('pdfBtn').addEventListener('click', exportPDF);
+initMap();
+</script>
+</body>
+</html>
