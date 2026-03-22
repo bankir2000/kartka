@@ -121,6 +121,23 @@
             margin-top: 10px; color: #f0e6c5; font-size: 13px;
             min-height: 22px; text-align: center; width: 100%; max-width: 1000px;
         }
+        /* Індикатор мережі */
+        #netStatus {
+            position: fixed; top: 0; left: 0; right: 0;
+            height: 6px; z-index: 99998;
+            transition: background 0.4s ease;
+        }
+        #netStatus.online  { background: #27ae60; }
+        #netStatus.offline { background: #c0392b; }
+        #netStatusLabel {
+            position: fixed; top: 6px; right: 10px;
+            font-size: 11px; font-weight: bold;
+            padding: 2px 8px; border-radius: 0 0 6px 6px;
+            z-index: 99998; transition: all 0.4s ease;
+            letter-spacing: 0.5px;
+        }
+        #netStatusLabel.online  { background: #27ae60; color: #fff; }
+        #netStatusLabel.offline { background: #c0392b; color: #fff; }
         /* Заголовок сайту */
         .site-header {
             width: 100%; max-width: 1000px;
@@ -328,6 +345,9 @@
     </style>
 </head>
 <body>
+    <!-- Індикатор мережі -->
+    <div id="netStatus"></div>
+    <div id="netStatusLabel"></div>
     <!-- Заголовок та налаштування -->
     <div class="site-header">
         <div class="site-title">🗺 Картка вогню</div>
@@ -1464,6 +1484,31 @@ document.getElementById('orientirsList').addEventListener('input', function(e) {
 // Автовиправлення коми в полі координат центру
 document.getElementById('coordInput').addEventListener('blur', function() {
     this.value = this.value.replace(/(\d),(\d)/g, '$1.$2');
+    // Попередження якщо онлайн і координати введені
+    if (navigator.onLine && this.value.trim()) {
+        const warned = sessionStorage.getItem('onlineWarned');
+        if (!warned) {
+            sessionStorage.setItem('onlineWarned', '1');
+            setTimeout(() => {
+                if (confirm(
+                    '⚠️ УВАГА!\n\n' +
+                    'Ви працюєте з увімкненим інтернетом.\n\n' +
+                    'Тайли карти передаються через мережу — ' +
+                    'район роботи може бути відстежений.\n\n' +
+                    'Рекомендується:\n' +
+                    '1. Спочатку кешуйте область (📥 Кешувати область)\n' +
+                    '2. Вимкніть інтернет (режим «В літаку»)\n' +
+                    '3. Тоді вводьте координати\n\n' +
+                    'Продовжити роботу в інтернеті під власну відповідальність?'
+                )) {
+                    // Користувач підтвердив — продовжуємо
+                } else {
+                    // Користувач відмовився — очищаємо поле
+                    this.value = '';
+                }
+            }, 300);
+        }
+    }
 });
 document.getElementById('coordInput').addEventListener('input', function() {
     const pos = this.selectionStart;
@@ -1475,7 +1520,24 @@ document.getElementById('coordInput').addEventListener('input', function() {
 });
 document.getElementById('applyBtn').addEventListener('click', updateGrid);
 document.getElementById('pdfBtn').addEventListener('click', exportPDF);
-// initMap() викликається через _onLibsReady після завантаження бібліотек
+
+// ── Індикатор мережі ──────────────────────────────────────────
+function updateNetStatus() {
+    const bar   = document.getElementById('netStatus');
+    const label = document.getElementById('netStatusLabel');
+    if (navigator.onLine) {
+        bar.className   = 'online';
+        label.className = 'online';
+        label.textContent = '🌐 Онлайн';
+    } else {
+        bar.className   = 'offline';
+        label.className = 'offline';
+        label.textContent = '🔒 Офлайн';
+    }
+}
+updateNetStatus();
+window.addEventListener('online',  updateNetStatus);
+window.addEventListener('offline', updateNetStatus);
 </script>
 </body>
 </html>
