@@ -3,11 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Картка вогню - Азимутна сітка 1-4 км</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
+    <title>Картка вогню</title>
+    <link rel="stylesheet" href="libs/leaflet.css" onerror="this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'"/>
+    <script>
+    (function(){
+        function loadScript(local, cdn, cb){
+            var s=document.createElement('script');
+            s.src=local; s.onload=cb||function(){};
+            s.onerror=function(){ var s2=document.createElement('script'); s2.src=cdn; s2.onload=cb||function(){}; document.head.appendChild(s2); };
+            document.head.appendChild(s);
+        }
+        window._libsToLoad=3;
+        window._libLoaded=function(){ if(--window._libsToLoad===0 && window._onLibsReady) window._onLibsReady(); };
+        loadScript('libs/leaflet.js','https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',window._libLoaded);
+        loadScript('libs/jspdf.js','https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',window._libLoaded);
+        loadScript('libs/turf.js','https://unpkg.com/@turf/turf@6.5.0/turf.min.js',window._libLoaded);
+    })();
+    </script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -181,13 +193,122 @@
             cursor: pointer;
         }
         .modal-cancel:hover { background: #4a7a4a; }
+        /* Кешування */
+        .cache-modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); z-index: 99999;
+            align-items: center; justify-content: center;
+        }
+        .cache-modal-overlay.open { display: flex; }
+        .cache-modal {
+            background: #1e2a1c; border-radius: 14px;
+            padding: 24px 28px; width: 92%; max-width: 460px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        }
+        .cache-modal h2 { color: #f0e6c5; font-size: 16px; margin-bottom: 16px; text-align: center; }
+        .cache-modal select {
+            width: 100%; background: #fef9e6; border: 2px solid #c4a747;
+            padding: 10px 12px; font-size: 14px; font-weight: bold;
+            border-radius: 7px; margin-bottom: 12px;
+        }
+        .cache-zoom-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+        .cache-zoom-row label {
+            color: #f0e6c5; font-size: 13px; display: flex;
+            align-items: center; gap: 5px; cursor: pointer;
+        }
+        .cache-zoom-row input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+        .cache-progress {
+            background: #2c3e2f; border-radius: 8px;
+            padding: 10px 14px; margin-bottom: 12px;
+            color: #f0e6c5; font-size: 13px; display: none;
+        }
+        .cache-progress-bar {
+            height: 8px; background: #3a5a3a; border-radius: 4px;
+            margin-top: 8px; overflow: hidden;
+        }
+        .cache-progress-fill {
+            height: 100%; background: #c4a747; border-radius: 4px;
+            width: 0%; transition: width 0.3s;
+        }
+        .cache-start-btn {
+            width: 100%; background: #27ae60; color: #fff;
+            border: none; padding: 11px; border-radius: 8px;
+            font-weight: bold; font-size: 14px; cursor: pointer;
+            margin-bottom: 8px;
+        }
+        .cache-start-btn:hover { background: #2ecc71; }
+        .cache-start-btn:disabled { background: #555; cursor: not-allowed; }
+        .cache-close-btn {
+            width: 100%; background: #3a5a3a; color: #f0e6c5;
+            border: 2px solid #6a8f6a; padding: 9px; border-radius: 8px;
+            font-weight: bold; font-size: 13px; cursor: pointer;
+        }
+        .cache-close-btn:hover { background: #4a7a4a; }
+        .cache-btn {
+            margin-top: 8px; background: #1a5c33; color: #f0e6c5;
+            border: 2px solid #27ae60; padding: 8px 22px;
+            border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;
+        }
+        .cache-btn:hover { background: #27ae60; }
     </style>
 </head>
 <body>
     <!-- Заголовок та налаштування -->
     <div class="site-header">
         <div class="site-title">🗺 Картка вогню</div>
-        <button class="settings-btn" id="settingsBtn">⚙️ Налаштування реквізитів</button>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;">
+            <button class="settings-btn" id="settingsBtn">⚙️ Налаштування реквізитів</button>
+            <button class="cache-btn" id="cacheBtn">📥 Кешувати область</button>
+        </div>
+    </div>
+
+    <!-- Модальне вікно кешування -->
+    <div class="cache-modal-overlay" id="cacheModalOverlay">
+        <div class="cache-modal">
+            <h2>📥 Кешування карти області</h2>
+            <label style="color:#c4a747;font-size:12px;font-weight:bold;display:block;margin-bottom:6px;">Оберіть область:</label>
+            <select id="regionSelect">
+                <option value="">— Оберіть область —</option>
+                <option value="49.5,36.0,50.4,38.3">Харківська</option>
+                <option value="49.0,32.5,50.4,34.8">Полтавська</option>
+                <option value="47.8,33.5,48.8,36.5">Дніпропетровська</option>
+                <option value="47.0,37.0,48.5,39.5">Донецька</option>
+                <option value="47.8,38.0,48.8,40.2">Луганська</option>
+                <option value="48.3,30.2,50.0,32.5">Черкаська</option>
+                <option value="50.0,30.0,51.5,32.5">Київська</option>
+                <option value="50.2,27.0,51.8,30.0">Житомирська</option>
+                <option value="50.5,25.0,51.9,28.0">Рівненська</option>
+                <option value="49.5,23.5,51.0,26.0">Волинська</option>
+                <option value="48.5,22.0,49.5,24.5">Закарпатська</option>
+                <option value="47.8,23.5,49.0,26.5">Івано-Франківська</option>
+                <option value="49.0,23.0,50.5,25.5">Львівська</option>
+                <option value="48.0,25.5,49.5,27.5">Тернопільська</option>
+                <option value="48.3,27.5,49.8,30.0">Хмельницька</option>
+                <option value="47.5,28.5,49.0,30.5">Вінницька</option>
+                <option value="47.0,29.5,48.5,32.0">Кіровоградська</option>
+                <option value="46.5,32.0,48.0,34.0">Миколаївська</option>
+                <option value="46.2,30.5,47.5,32.8">Одеська</option>
+                <option value="46.5,34.5,47.5,36.5">Запорізька</option>
+                <option value="46.5,32.5,47.5,34.5">Херсонська</option>
+                <option value="49.8,31.5,51.5,34.0">Чернігівська</option>
+                <option value="51.0,32.5,52.5,35.0">Сумська</option>
+                <option value="48.0,25.5,49.5,28.0">Чернівецька</option>
+            </select>
+            <div style="color:#f0e6c5;font-size:12px;font-weight:bold;margin-bottom:8px;">Рівні zoom:</div>
+            <div class="cache-zoom-row">
+                <label><input type="checkbox" class="zoom-check" value="10" checked> Zoom 10 (~5 МБ)</label>
+                <label><input type="checkbox" class="zoom-check" value="11" checked> Zoom 11 (~20 МБ)</label>
+                <label><input type="checkbox" class="zoom-check" value="12" checked> Zoom 12 (~80 МБ)</label>
+                <label><input type="checkbox" class="zoom-check" value="13"> Zoom 13 (~320 МБ)</label>
+            </div>
+            <div class="cache-progress" id="cacheProgress">
+                <div id="cacheProgressText">Підготовка...</div>
+                <div class="cache-progress-bar"><div class="cache-progress-fill" id="cacheProgressFill"></div></div>
+                <div id="cacheProgressSub" style="font-size:11px;color:#c4a747;margin-top:4px;"></div>
+            </div>
+            <button class="cache-start-btn" id="cacheStartBtn">⬇️ Почати завантаження</button>
+            <button class="cache-close-btn" id="cacheCloseBtn">✕ Закрити</button>
+        </div>
     </div>
 
     <!-- Модальне вікно реквізитів -->
@@ -467,7 +588,24 @@ function drawGrid(mapInstance, oldLayer, lat, lng, posName, redZones, orientirs)
 
 function initMap() {
     mainMap = L.map('map', { preferCanvas: true }).setView([48.5, 31.0], 6);
-    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { attribution: 'OpenTopoMap', maxZoom: 18 }).addTo(mainMap);
+    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        attribution: 'OpenTopoMap',
+        maxZoom: 18
+    }).addTo(mainMap);
+
+    // Реєструємо Service Worker для кешування тайлів
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log('SW зареєстровано:', reg.scope);
+        }).catch(err => {
+            console.log('SW не зареєстровано (локальний файл?):', err);
+        });
+    }
+}
+
+window._onLibsReady = function() { initMap(); };
+if (typeof L !== 'undefined' && typeof turf !== 'undefined' && typeof window.jspdf !== 'undefined') {
+    initMap();
 }
 
 function updateGrid() {
@@ -1017,7 +1155,90 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
 });
 
-document.getElementById('coordInput').addEventListener('blur', function() {
+document.getElementById('cacheBtn').addEventListener('click', () => {
+    document.getElementById('cacheModalOverlay').classList.add('open');
+    document.getElementById('cacheProgress').style.display = 'none';
+    document.getElementById('cacheStartBtn').disabled = false;
+    document.getElementById('cacheStartBtn').textContent = '⬇️ Почати завантаження';
+});
+document.getElementById('cacheCloseBtn').addEventListener('click', () => {
+    document.getElementById('cacheModalOverlay').classList.remove('open');
+});
+document.getElementById('cacheModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+});
+
+document.getElementById('cacheStartBtn').addEventListener('click', async () => {
+    const regionVal = document.getElementById('regionSelect').value;
+    if (!regionVal) { alert('Оберіть область зі списку'); return; }
+
+    const zooms = [...document.querySelectorAll('.zoom-check:checked')].map(c => parseInt(c.value));
+    if (zooms.length === 0) { alert('Оберіть хоча б один рівень zoom'); return; }
+
+    const [south, west, north, east] = regionVal.split(',').map(Number);
+
+    const btn = document.getElementById('cacheStartBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Завантаження...';
+    const progressEl = document.getElementById('cacheProgress');
+    const progressText = document.getElementById('cacheProgressText');
+    const progressFill = document.getElementById('cacheProgressFill');
+    const progressSub = document.getElementById('cacheProgressSub');
+    progressEl.style.display = 'block';
+
+    // Підраховуємо загальну кількість тайлів
+    function getTiles(z, s, w, n, e) {
+        const tiles = [];
+        const nTiles = Math.pow(2, z);
+        function ll2t(lat, lng) {
+            return {
+                x: Math.floor((lng + 180) / 360 * nTiles),
+                y: Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * nTiles)
+            };
+        }
+        const nw = ll2t(n, w), se = ll2t(s, e);
+        for (let x = nw.x; x <= se.x; x++)
+            for (let y = nw.y; y <= se.y; y++)
+                tiles.push({z, x, y});
+        return tiles;
+    }
+
+    let allTiles = [];
+    zooms.forEach(z => { allTiles = allTiles.concat(getTiles(z, south, west, north, east)); });
+
+    const total = allTiles.length;
+    progressText.textContent = `Завантаження 0 / ${total} тайлів`;
+    progressFill.style.width = '0%';
+
+    let done = 0, errors = 0;
+    const BATCH = 6; // паралельно
+
+    const cache = await caches.open('kartka-vognyu-tiles-v1');
+
+    for (let i = 0; i < allTiles.length; i += BATCH) {
+        const batch = allTiles.slice(i, i + BATCH);
+        await Promise.all(batch.map(async ({z, x, y}) => {
+            const sub = ['a','b','c'][Math.abs(x + y) % 3];
+            const url = `https://${sub}.tile.opentopomap.org/${z}/${x}/${y}.png`;
+            try {
+                const cached = await cache.match(url);
+                if (!cached) {
+                    const resp = await fetch(url, {signal: AbortSignal.timeout(10000)});
+                    if (resp.ok) await cache.put(url, resp);
+                }
+            } catch { errors++; }
+            done++;
+        }));
+        const pct = Math.round(done / total * 100);
+        progressFill.style.width = pct + '%';
+        progressText.textContent = `Завантаження ${done} / ${total} тайлів`;
+        progressSub.textContent = `${pct}% | Помилок: ${errors}`;
+    }
+
+    btn.textContent = '✅ Готово!';
+    progressText.textContent = `✅ Кешовано ${done - errors} тайлів з ${total}`;
+    progressSub.textContent = errors > 0 ? `⚠️ Пропущено: ${errors} (мережеві помилки)` : '🔒 Область доступна офлайн';
+});
     this.value = this.value.replace(/(\d),(\d)/g, '$1.$2');
 });
 
@@ -1029,7 +1250,7 @@ document.getElementById('orientirsList').addEventListener('blur', function(e) {
 }, true);
 document.getElementById('applyBtn').addEventListener('click', updateGrid);
 document.getElementById('pdfBtn').addEventListener('click', exportPDF);
-initMap();
+// initMap() викликається через _onLibsReady після завантаження бібліотек
 </script>
 </body>
 </html>
