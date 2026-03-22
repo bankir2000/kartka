@@ -4,6 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
     <title>Картка вогню</title>
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json"/>
+    <meta name="theme-color" content="#2c3e2f"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+    <meta name="apple-mobile-web-app-title" content="Картка вогню"/>
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192.png"/>
+    <link rel="apple-touch-icon" sizes="512x512" href="icons/icon-512.png"/>
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png"/>
     <link rel="stylesheet" href="libs/leaflet.css" onerror="this.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'"/>
     <script>
     (function(){
@@ -139,6 +149,71 @@
             letter-spacing: 0.5px;
         }
         .settings-btn:hover { background: #4a7a4a; }
+        .info-btn {
+            margin-top: 10px;
+            background: #2a4a6a;
+            color: #f0e6c5;
+            border: 2px solid #4a7aaa;
+            padding: 8px 22px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+        }
+        .info-btn:hover { background: #3a6a9a; }
+        /* Модальне вікно інструкції */
+        .info-modal-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.75); z-index: 99999;
+            align-items: flex-start; justify-content: center;
+            overflow-y: auto; padding: 20px 0;
+        }
+        .info-modal-overlay.open { display: flex; }
+        .info-modal {
+            background: #1a2a1a; border-radius: 14px;
+            padding: 24px 22px; width: 94%; max-width: 560px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+            margin: auto;
+        }
+        .info-modal h2 {
+            color: #f0e6c5; font-size: 17px; font-weight: bold;
+            text-align: center; margin-bottom: 18px;
+            letter-spacing: 1px; border-bottom: 1px solid #3a5a3a;
+            padding-bottom: 12px;
+        }
+        .info-section {
+            margin-bottom: 16px;
+        }
+        .info-section h3 {
+            color: #c4a747; font-size: 13px; font-weight: bold;
+            margin-bottom: 8px; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .info-section p, .info-section li {
+            color: #d0dcc0; font-size: 13px; line-height: 1.6;
+            margin-bottom: 5px;
+        }
+        .info-section ul { padding-left: 18px; }
+        .info-section li { list-style: none; padding-left: 4px; }
+        .info-ok { color: #4caf50; font-weight: bold; }
+        .info-warn { color: #ff9800; font-weight: bold; }
+        .info-danger { color: #f44336; font-weight: bold; }
+        .info-step {
+            background: #2a3a2a; border-radius: 8px;
+            padding: 10px 14px; margin-bottom: 8px;
+            border-left: 3px solid #c4a747;
+        }
+        .info-step-num {
+            color: #c4a747; font-weight: bold; font-size: 13px;
+        }
+        .info-close-btn {
+            width: 100%; background: #3a5a3a; color: #f0e6c5;
+            border: 2px solid #6a8f6a; padding: 12px;
+            border-radius: 8px; font-weight: bold; font-size: 14px;
+            cursor: pointer; margin-top: 8px;
+        }
+        .info-close-btn:hover { background: #4a7a4a; }
         /* Модальне вікно */
         .modal-overlay {
             display: none;
@@ -259,6 +334,92 @@
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:10px;">
             <button class="settings-btn" id="settingsBtn">⚙️ Налаштування реквізитів</button>
             <button class="cache-btn" id="cacheBtn">📥 Кешувати область</button>
+            <button class="info-btn" id="infoBtn">📖 Інструкція</button>
+        </div>
+    </div>
+
+    <!-- Модальне вікно інструкції -->
+    <div class="info-modal-overlay" id="infoModalOverlay">
+        <div class="info-modal">
+            <h2>📖 Інструкція з використання</h2>
+
+            <div class="info-section">
+                <h3>🎯 Що робить програма</h3>
+                <ul>
+                    <li>📍 Будує азимутну сітку 1-4 км на топографічній карті</li>
+                    <li>🟢 Позначає орієнтири з відстанню в гектометрах</li>
+                    <li>🔴 Позначає заборонені сектори обстрілу</li>
+                    <li>📄 Генерує PDF документ «Картка вогню»</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h3>🔒 Кібербезпека</h3>
+                <ul>
+                    <li><span class="info-ok">✅</span> Координати позиції — нікуди не передаються</li>
+                    <li><span class="info-ok">✅</span> PDF генерується локально на пристрої</li>
+                    <li><span class="info-ok">✅</span> Реквізити командира — зберігаються тільки на пристрої</li>
+                    <li><span class="info-warn">⚠️</span> Тайли карти завантажуються з інтернету — сервер бачить район роботи</li>
+                </ul>
+            </div>
+
+            <div class="info-section">
+                <h3>📥 Безпечна робота офлайн</h3>
+                <div class="info-step">
+                    <div class="info-step-num">1. Кешуйте область заздалегідь</div>
+                    <p>Натисніть «📥 Кешувати область» → оберіть потрібну область → zoom 10, 11, 12 → «Почати завантаження». Зачекайте завершення (5-15 хвилин).</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">2. Вмикайте режим «В літаку»</div>
+                    <p>Після кешування завжди працюйте з вимкненим інтернетом. Карта, сітка та PDF працюють повністю офлайн.</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">3. Очищайте дані після роботи</div>
+                    <p>Chrome → ⋮ → Налаштування → Конфіденційність → Видалити дані перегляду → Кешовані зображення. Або використовуйте режим інкогніто.</p>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>📋 Як користуватися</h3>
+                <div class="info-step">
+                    <div class="info-step-num">Крок 1 — Реквізити (необов'язково)</div>
+                    <p>Натисніть «⚙️ Налаштування реквізитів» → введіть звання та ПІБ командира → збережіть. Ці дані автоматично потраплять у PDF. Якщо не заповнити — у PDF залишаться порожні рядки для підпису вручну.</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">Крок 2 — Координати</div>
+                    <p>Введіть координати центру позиції. Підтримується формат з крапкою (50.123456, 36.123456) та з комою (50,123456, 36,123456).</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">Крок 3 — Орієнтири (за потреби)</div>
+                    <p>Введіть координати орієнтирів. Програма автоматично розрахує відстань від позиції до кожного орієнтиру.</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">Крок 4 — Червоні зони (за потреби)</div>
+                    <p>Введіть діапазон градусів забороненого сектору, наприклад: 0-30. Можна додати кілька зон.</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">Крок 5 — Побудова і PDF</div>
+                    <p>Натисніть «🏹 ПОБУДУВАТИ АЗИМУТНУ СІТКУ» → перевірте результат на карті → натисніть «📄 ЗБЕРЕГТИ PDF».</p>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>⚡ Швидкі поради</h3>
+                <div class="info-step">
+                    <div class="info-step-num">📲 Встановлення як окремої програми</div>
+                    <p>Програма встановлюється на телефон як окремий додаток — без браузера, з іконкою на головному екрані.</p>
+                    <p style="margin-top:6px;"><b>Android Chrome:</b> ⋮ → «Додати на головний екран» → «Встановити»</p>
+                    <p style="margin-top:4px;"><b>iOS Safari:</b> кнопка «Поділитися» → «На екран Home»</p>
+                    <p style="margin-top:6px;color:#c4a747;">Після встановлення програма працює як нативний додаток — окреме вікно, без адресного рядка браузера, повністю офлайн після кешування.</p>
+                </div>
+                <ul style="margin-top:10px;">
+                    <li>🔄 Координати з комою замість крапки — виправляються автоматично</li>
+                    <li>📄 Назва PDF файлу = назва позиції (поле «Назва позиції»)</li>
+                    <li>💾 Реквізити зберігаються між сесіями автоматично</li>
+                </ul>
+            </div>
+
+            <button class="info-close-btn" id="infoCloseBtn">✕ Закрити</button>
         </div>
     </div>
 
@@ -1168,6 +1329,16 @@ document.getElementById('modalOverlay').addEventListener('click', function(e) {
     if (e.target === this) this.classList.remove('open');
 });
 
+document.getElementById('infoBtn').addEventListener('click', () => {
+    document.getElementById('infoModalOverlay').classList.add('open');
+});
+document.getElementById('infoCloseBtn').addEventListener('click', () => {
+    document.getElementById('infoModalOverlay').classList.remove('open');
+});
+document.getElementById('infoModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('open');
+});
+
 document.getElementById('cacheBtn').addEventListener('click', async () => {
     document.getElementById('cacheModalOverlay').classList.add('open');
     document.getElementById('cacheProgress').style.display = 'none';
@@ -1279,6 +1450,29 @@ document.getElementById('orientirsList').addEventListener('blur', function(e) {
         e.target.value = e.target.value.replace(/(\d),(\d)/g, '$1.$2');
     }
 }, true);
+document.getElementById('orientirsList').addEventListener('input', function(e) {
+    if (e.target.classList.contains('or-input')) {
+        const pos = e.target.selectionStart;
+        const fixed = e.target.value.replace(/(\d),(\d)/g, '$1.$2');
+        if (fixed !== e.target.value) {
+            e.target.value = fixed;
+            e.target.setSelectionRange(pos, pos);
+        }
+    }
+}, true);
+
+// Автовиправлення коми в полі координат центру
+document.getElementById('coordInput').addEventListener('blur', function() {
+    this.value = this.value.replace(/(\d),(\d)/g, '$1.$2');
+});
+document.getElementById('coordInput').addEventListener('input', function() {
+    const pos = this.selectionStart;
+    const fixed = this.value.replace(/(\d),(\d)/g, '$1.$2');
+    if (fixed !== this.value) {
+        this.value = fixed;
+        this.setSelectionRange(pos, pos);
+    }
+});
 document.getElementById('applyBtn').addEventListener('click', updateGrid);
 document.getElementById('pdfBtn').addEventListener('click', exportPDF);
 // initMap() викликається через _onLibsReady після завантаження бібліотек

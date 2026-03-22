@@ -12,7 +12,10 @@ const APP_SHELL = [
     './',
     './index.html',
     './sw.js',
-    // CDN бібліотеки — кешуємо з інтернету при першому запуску
+    './manifest.json',
+    './icons/icon-192.png',
+    './icons/icon-512.png',
+    // CDN бібліотеки
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
     'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
     'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
