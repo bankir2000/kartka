@@ -1179,7 +1179,7 @@ document.getElementById('cacheBtn').addEventListener('click', async () => {
     const clearBtn = document.getElementById('cacheClearBtn');
     if ('caches' in window) {
         try {
-            const cache = await caches.open('kartka-vognyu-tiles-v1');
+            const cache = await caches.open('kartka-tiles-v1');
             const keys = await cache.keys();
             if (keys.length > 0) {
                 sizeEl.textContent = `💾 В кеші: ${keys.length} тайлів`;
@@ -1199,7 +1199,7 @@ document.getElementById('cacheCloseBtn').addEventListener('click', () => {
 });
 document.getElementById('cacheClearBtn').addEventListener('click', async () => {
     if (!confirm('Видалити всі кешовані тайли?\nПісля цього потрібен інтернет для перегляду карти.')) return;
-    await caches.delete('kartka-vognyu-tiles-v1');
+    await caches.delete('kartka-tiles-v1');
     document.getElementById('cacheSizeInfo').textContent = 'Кеш очищено ✅';
     document.getElementById('cacheClearBtn').style.display = 'none';
 });
@@ -1244,7 +1244,7 @@ document.getElementById('cacheStartBtn').addEventListener('click', async () => {
     await new Promise(r => setTimeout(r, 50));
     let done = 0, errors = 0, skipped = 0;
     let cache;
-    try { cache = await caches.open('kartka-vognyu-tiles-v1'); }
+    try { cache = await caches.open('kartka-tiles-v1'); }
     catch(e) { alert('Помилка кешу: ' + e.message); btn.disabled=false; btn.textContent='⬇️ Почати завантаження'; return; }
     const BATCH = 4;
     for (let i = 0; i < allTiles.length; i += BATCH) {
