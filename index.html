@@ -1171,75 +1171,67 @@ document.getElementById('cacheModalOverlay').addEventListener('click', function(
 document.getElementById('cacheStartBtn').addEventListener('click', async () => {
     const regionVal = document.getElementById('regionSelect').value;
     if (!regionVal) { alert('Оберіть область зі списку'); return; }
-
     const zooms = [...document.querySelectorAll('.zoom-check:checked')].map(c => parseInt(c.value));
     if (zooms.length === 0) { alert('Оберіть хоча б один рівень zoom'); return; }
-
+    if (!('caches' in window)) {
+        alert('Cache API недоступний.\n\nВідкрийте через:\n• http://localhost:8080\n• або GitHub Pages');
+        return;
+    }
     const [south, west, north, east] = regionVal.split(',').map(Number);
-
     const btn = document.getElementById('cacheStartBtn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Завантаження...';
+    btn.disabled = true; btn.textContent = '⏳ Завантаження...';
     const progressEl = document.getElementById('cacheProgress');
     const progressText = document.getElementById('cacheProgressText');
     const progressFill = document.getElementById('cacheProgressFill');
     const progressSub = document.getElementById('cacheProgressSub');
     progressEl.style.display = 'block';
-
-    // Підраховуємо загальну кількість тайлів
     function getTiles(z, s, w, n, e) {
-        const tiles = [];
-        const nTiles = Math.pow(2, z);
-        function ll2t(lat, lng) {
-            return {
-                x: Math.floor((lng + 180) / 360 * nTiles),
-                y: Math.floor((1 - Math.log(Math.tan(lat * Math.PI/180) + 1/Math.cos(lat * Math.PI/180)) / Math.PI) / 2 * nTiles)
-            };
-        }
+        const tiles = [], nT = Math.pow(2, z);
+        const ll2t = (lat, lng) => ({
+            x: Math.floor((lng + 180) / 360 * nT),
+            y: Math.floor((1 - Math.log(Math.tan(lat*Math.PI/180) + 1/Math.cos(lat*Math.PI/180))/Math.PI)/2*nT)
+        });
         const nw = ll2t(n, w), se = ll2t(s, e);
         for (let x = nw.x; x <= se.x; x++)
             for (let y = nw.y; y <= se.y; y++)
                 tiles.push({z, x, y});
         return tiles;
     }
-
     let allTiles = [];
     zooms.forEach(z => { allTiles = allTiles.concat(getTiles(z, south, west, north, east)); });
-
     const total = allTiles.length;
-    progressText.textContent = `Завантаження 0 / ${total} тайлів`;
+    progressText.textContent = `Підготовка: ${total} тайлів...`;
     progressFill.style.width = '0%';
-
-    let done = 0, errors = 0;
-    const BATCH = 6; // паралельно
-
-    const cache = await caches.open('kartka-vognyu-tiles-v1');
-
+    await new Promise(r => setTimeout(r, 50));
+    let done = 0, errors = 0, skipped = 0;
+    let cache;
+    try { cache = await caches.open('kartka-vognyu-tiles-v1'); }
+    catch(e) { alert('Помилка кешу: ' + e.message); btn.disabled=false; btn.textContent='⬇️ Почати завантаження'; return; }
+    const BATCH = 4;
     for (let i = 0; i < allTiles.length; i += BATCH) {
         const batch = allTiles.slice(i, i + BATCH);
         await Promise.all(batch.map(async ({z, x, y}) => {
-            const sub = ['a','b','c'][Math.abs(x + y) % 3];
+            const sub = ['a','b','c'][Math.abs(x+y)%3];
             const url = `https://${sub}.tile.opentopomap.org/${z}/${x}/${y}.png`;
             try {
-                const cached = await cache.match(url);
-                if (!cached) {
-                    const resp = await fetch(url, {signal: AbortSignal.timeout(10000)});
-                    if (resp.ok) await cache.put(url, resp);
+                if (await cache.match(url)) { skipped++; }
+                else {
+                    const resp = await fetch(url, {mode:'cors', signal: AbortSignal.timeout(12000)});
+                    if (resp.ok) await cache.put(url, resp.clone());
+                    else errors++;
                 }
             } catch { errors++; }
             done++;
         }));
-        const pct = Math.round(done / total * 100);
+        const pct = Math.round(done/total*100);
         progressFill.style.width = pct + '%';
-        progressText.textContent = `Завантаження ${done} / ${total} тайлів`;
-        progressSub.textContent = `${pct}% | Помилок: ${errors}`;
+        progressText.textContent = `${done} / ${total} (${pct}%)`;
+        progressSub.textContent = `✅ Нових: ${done-errors-skipped} | 💾 Кеш: ${skipped} | ❌ Помилок: ${errors}`;
+        if (i % 40 === 0) await new Promise(r => setTimeout(r, 10));
     }
-
     btn.textContent = '✅ Готово!';
-    progressText.textContent = `✅ Кешовано ${done - errors} тайлів з ${total}`;
-    progressSub.textContent = errors > 0 ? `⚠️ Пропущено: ${errors} (мережеві помилки)` : '🔒 Область доступна офлайн';
-});
-    this.value = this.value.replace(/(\d),(\d)/g, '$1.$2');
+    progressText.textContent = `✅ Завершено: ${done-errors} / ${total}`;
+    progressSub.textContent = errors > 0 ? `⚠️ Помилок: ${errors}` : '🔒 Область доступна офлайн!';
 });
 
 // Автовиправлення коми в полях орієнтирів при втраті фокусу
