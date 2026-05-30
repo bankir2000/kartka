@@ -1102,20 +1102,19 @@ async function exportPDF() {
         // Рядок 3: Командир ___ — по центру правої половини
         // Рядок 4: риска + (військове звання...) — по центру правої половини
         // Рядок 5: «___» ___ 20___ р. — по центру правої половини
-        const hH = 42 * SC;
+        const hH = 48 * SC;
         const hW = Math.round((PW - M * 2) * SC);
         const hc = document.createElement('canvas'); hc.width = hW; hc.height = hH;
         const hx = hc.getContext('2d');
         hx.fillStyle = '#fff'; hx.fillRect(0, 0, hW, hH); hx.fillStyle = '#000';
 
-        const rightCx = hW * 0.72;
-        const cmdX = hW * 0.47;
+        const rightX = hW * 0.47; // лівий край правого блоку
 
-        // Рядок 1: КАРТКА ВОГНЮ
+        // Рядок 1: КАРТКА ВОГНЮ — по центру
         hx.font = `bold ${6.5 * SC}px Arial`; hx.textAlign = 'center';
         hx.fillText('КАРТКА ВОГНЮ', hW / 2, 7 * SC);
 
-        // Рядок 2: МВГ/ВГ та назва зброї
+        // Рядок 2: МВГ/ВГ та назва зброї — по центру
         const mvgType = document.getElementById('mvgTypeSelect').value || 'МВГ';
         const mvgVal = (document.getElementById('mvgInput').value || '').trim();
         const weaponName = document.getElementById('weaponSelect').options[document.getElementById('weaponSelect').selectedIndex]?.text || '';
@@ -1127,47 +1126,35 @@ async function exportPDF() {
             hx.fillText(subLine, hW / 2, 13 * SC);
         }
 
-        // Рядок 3: «ЗАТВЕРДЖУЮ»
+        // Рядок 3: «ЗАТВЕРДЖУЮ» — правий блок по центру
         hx.font = `bold ${4 * SC}px Arial`; hx.textAlign = 'center';
-        hx.fillText('«ЗАТВЕРДЖУЮ»', rightCx, 19 * SC);
+        hx.fillText('«ЗАТВЕРДЖУЮ»', rightX + (hW - rightX) / 2, 19 * SC);
 
-        // Рядок 4: Командир [звання] [___підпис___] [ПІБ]
+        // Рядок 4: Командир [звання] — правий блок, перший рядок підпису
         const puRankH = getPuRank();
         const puNameH = getPuName();
         hx.font = `${3.8 * SC}px Arial`; hx.textAlign = 'left';
-        let hx4 = cmdX;
-        hx.fillText('Командир', hx4, 26 * SC);
-        hx4 += 24 * SC;
+        hx.fillText(`Командир  ${puRankH}`, rightX, 26 * SC);
 
-        if (puRankH) {
-            hx.font = `${3.8 * SC}px Arial`;
-            hx.fillText(puRankH, hx4, 26 * SC);
-            hx4 += hx.measureText(puRankH).width + 3 * SC;
-        }
-
-        const signW4 = 22 * SC;
-        hx.beginPath(); hx.moveTo(hx4, 26.5 * SC); hx.lineTo(hx4 + signW4, 26.5 * SC);
+        // Рядок 5: [___підпис___] [ПІБ] — правий блок, другий рядок
+        const signW4 = 28 * SC;
+        hx.beginPath(); hx.moveTo(rightX, 32.5 * SC); hx.lineTo(rightX + signW4, 32.5 * SC);
         hx.lineWidth = 0.8; hx.strokeStyle = '#000'; hx.stroke();
-        hx4 += signW4 + 3 * SC;
-
         if (puNameH) {
-            hx.font = `${3.8 * SC}px Arial`;
-            hx.fillText(puNameH, hx4, 26 * SC);
+            hx.fillText(puNameH, rightX + signW4 + 3 * SC, 32 * SC);
         }
 
-        // Рядок 5: дата
+        // Рядок 6: дата — правий блок
         const ukrainianMonths = ['січня','лютого','березня','квітня','травня','червня',
                                   'липня','серпня','вересня','жовтня','листопада','грудня'];
         const dateStr = document.getElementById('cardDateInput').value || new Date().toISOString().slice(0,10);
         const [dy, dm, dd] = dateStr.split('-');
-        const dateLine = `«${dd}» ${ukrainianMonths[parseInt(dm,10)-1]} ${dy} р.`;
-        hx.font = `${3.8 * SC}px Arial`; hx.textAlign = 'left';
-        hx.fillText(dateLine, cmdX + 24 * SC, 34 * SC);
+        hx.fillText(`«${dd}» ${ukrainianMonths[parseInt(dm,10)-1]} ${dy} р.`, rightX, 39 * SC);
 
-        pdf.addImage(hc.toDataURL('image/png'), 'PNG', M, M, PW - M * 2, 42);
+        pdf.addImage(hc.toDataURL('image/png'), 'PNG', M, M, PW - M * 2, 48);
 
         // ── Карта ──
-        const mapX = M, mapY = M + 44;
+        const mapX = M, mapY = M + 50;
         const mapW = PW - M * 2;
         const maxMapH = PH - mapY - 52; // залишаємо 52мм на підвал
         const mapH = Math.min(mapW * (ch / cw), maxMapH);
