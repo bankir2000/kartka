@@ -4,8 +4,8 @@
 // Повністю офлайн після першого відкриття
 // ═══════════════════════════════════════════════════════════════
 
-const APP_CACHE   = 'kartka-app-v1';      // сторінка + бібліотеки
-const TILE_CACHE  = 'kartka-tiles-v1';    // тайли карти
+const APP_CACHE   = 'kartka-app-v2';      // змінено версію — старий кеш видалиться
+const TILE_CACHE  = 'kartka-tiles-v1';    // тайли не чіпаємо
 
 // Файли додатку — кешуються при першому відкритті
 const APP_SHELL = [
@@ -117,31 +117,54 @@ async function handleTile(request) {
     }
 }
 
-// App shell: спочатку кеш → потім мережа
+// App shell: для index.html — Network First, для решти — Cache First
 async function handleApp(request) {
+    const url = new URL(request.url);
+    const isIndex = url.pathname.endsWith('/') || url.pathname.endsWith('/index.html');
+
+    if (isIndex) {
+        // Network First: завжди намагаємось отримати свіжу версію
+        try {
+            const response = await fetch(request, { cache: 'no-cache' });
+            if (response.ok) {
+                const cache = await caches.open(APP_CACHE);
+                cache.put(request, response.clone());
+                return response;
+            }
+        } catch {
+            // Офлайн — беремо з кешу
+        }
+        const cached = await caches.match(request) || await caches.match('./index.html');
+        return cached || new Response('Офлайн. Відкрийте спочатку з інтернетом.', {
+            status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+        });
+    }
+
+    // Решта — Cache First
     const cached = await caches.match(request);
     if (cached) return cached;
 
     try {
         const response = await fetch(request);
-        // Зберігаємо нові ресурси в кеш
         if (response.ok) {
             const cache = await caches.open(APP_CACHE);
             cache.put(request, response.clone());
         }
         return response;
     } catch {
-        // Офлайн і нема в кеші — повертаємо index.html (SPA fallback)
         const fallback = await caches.match('./index.html');
         return fallback || new Response('Офлайн. Відкрийте спочатку з інтернетом.', {
-            status: 503,
-            headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' }
         });
     }
 }
 
 // ── ПОВІДОМЛЕННЯ ВІД СТОРІНКИ ─────────────────────────────────
 self.addEventListener('message', async event => {
+    // Активувати новий SW одразу без очікування закриття вкладок
+    if (event.data?.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
     // Отримати кількість тайлів у кеші
     if (event.data?.type === 'GET_TILE_COUNT') {
         const cache = await caches.open(TILE_CACHE);

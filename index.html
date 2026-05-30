@@ -966,17 +966,36 @@ function initMap() {
 
     // Реєструємо Service Worker — визначаємо scope автоматично
     if ('serviceWorker' in navigator) {
-        // Визначаємо базовий шлях (для GitHub Pages: /kartka/, для localhost: /)
         const swPath = new URL('sw.js', window.location.href).pathname;
         navigator.serviceWorker.register(swPath).then(reg => {
             console.log('✅ SW зареєстровано:', reg.scope);
             setStatus('✅ Service Worker активний — кешування працює');
             setTimeout(() => setStatus(''), 3000);
+
+            // Якщо є новий воркер у стані waiting — одразу активуємо
+            if (reg.waiting) {
+                reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+            }
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                if (!newWorker) return;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // Новий SW встановлено — активуємо і перезавантажуємо
+                        newWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
+                });
+            });
         }).catch(err => {
             console.warn('⚠️ SW не зареєстровано:', err);
         });
 
-        // Показуємо статус онлайн/офлайн
+        // Коли новий SW взяв контроль — перезавантажуємо сторінку
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) { refreshing = true; window.location.reload(); }
+        });
+
         window.addEventListener('online',  () => setStatus('🌐 Онлайн'));
         window.addEventListener('offline', () => setStatus('🔒 Офлайн — карта з кешу'));
         if (!navigator.onLine) setStatus('🔒 Офлайн — карта з кешу');
@@ -1785,21 +1804,27 @@ const APP_VERSION = '1.1.0';
 async function checkForUpdates() {
     if (!navigator.onLine) return;
     try {
-        // Завантажуємо index.html з сервера без кешу
         const resp = await fetch('./index.html?_=' + Date.now(), {
             cache: 'no-store',
             signal: AbortSignal.timeout(8000)
         });
         if (!resp.ok) return;
         const html = await resp.text();
-        // Шукаємо версію в завантаженому файлі
         const match = html.match(/APP_VERSION\s*=\s*'([^']+)'/);
         if (!match) return;
         const serverVersion = match[1];
         if (serverVersion !== APP_VERSION) {
-            // Є нова версія — показуємо банер
-            document.getElementById('updateBanner').classList.add('show');
-            console.log(`Оновлення: ${APP_VERSION} → ${serverVersion}`);
+            console.log(`Оновлення: ${APP_VERSION} → ${serverVersion}, перезавантаження...`);
+            // Скидаємо кеш і SW, потім перезавантажуємо
+            if ('caches' in window) {
+                const keys = await caches.keys();
+                await Promise.all(keys.map(k => caches.delete(k)));
+            }
+            if ('serviceWorker' in navigator) {
+                const regs = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(regs.map(r => r.unregister()));
+            }
+            window.location.href = window.location.pathname + '?v=' + Date.now();
         }
     } catch(e) {
         console.log('Перевірка оновлень:', e.message);
