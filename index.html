@@ -638,9 +638,9 @@
                     <option value="1500,1000">SAR 127 MT</option>
                 </optgroup>
                 <optgroup label="Зенітні кулеметні установки (14.5 мм)">
-                    <option value="4000,1500">ЗКУ Viktor MR-2</option>
-                    <option value="1500,1000">ЗКУ-1(2)</option>
-                    <option value="1500,1000">ВКК КПВТ</option>
+                    <option value="4000,1000">ЗКУ Viktor MR-2</option>
+                    <option value="2000,1000">ЗКУ-1(2)</option>
+                    <option value="2000,1000">ВКК КПВТ</option>
                 </optgroup>
                 <optgroup label="Малокаліберна зенітна артилерія (20–30 мм)">
                     <option value="2000,1500">ЗУ М-55 20 мм</option>
@@ -649,8 +649,8 @@
                     <option value="3000,2000">Гармата HP 30 мм</option>
                 </optgroup>
                 <optgroup label="ЗУ-23-2 / ЗСУ-23-4 (23 мм)">
-                    <option value="2000,1500">ЗУ-23-2</option>
-                    <option value="2000,1500">ЗСУ-23-4 «Шилка» (Рокач)</option>
+                    <option value="2500,1500">ЗУ-23-2</option>
+                    <option value="2500,1500">ЗСУ-23-4 «Шилка» (Рокач)</option>
                 </optgroup>
                 <optgroup label="Середньокаліберна зенітна артилерія (35–57 мм)">
                     <option value="4000,3000">АЗГ L-70 Bofors 40 мм</option>
@@ -666,7 +666,7 @@
                 </optgroup>
                 <optgroup label="ПЗРК">
                     <option value="4500,3800">Stinger</option>
-                    <option value="4000,3000">Ігла / Ігла-1</option>
+                    <option value="5000,3000">Ігла / Ігла-1</option>
                     <option value="6500,4000">Piorun</option>
                     <option value="5500,3800">FN-6</option>
                     <option value="4000,2500">Стріла-1</option>
@@ -1446,8 +1446,8 @@ async function exportPDF() {
         fx.lineWidth = 0.35 * SC; fx.stroke();
         fx.fillText('8', orX + 3.5 * SC, orY2 + 6 * SC);
         fx.font = `${3.0 * SC}px Arial`;
-        fx.fillText('В чисельнику – номер орієнтира, в', col3 + 1.5 * SC, tY + tRH + 3.5 * SC);
-        fx.fillText('знаменнику – дальність до орієнтира в гм', col3 + 1.5 * SC, tY + tRH + 7.5 * SC);
+        fx.fillText('В чисельнику – номер орієнтира, в знаменнику –', col3 + 1.5 * SC, tY + tRH + 3.5 * SC);
+        fx.fillText('дальність до орієнтира в гм (1 гм = 100м)', col3 + 1.5 * SC, tY + tRH + 7.5 * SC);
 
         // Командир установки
         const cmdY = tY + tRH * 2 + 6 * SC;
