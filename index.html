@@ -1521,6 +1521,7 @@ async function exportPDF() {
             if (inp && inp.value.trim()) {
                 const c2 = parseCoords(inp.value.trim());
                 let distStr = '';
+                let azStr = '';
                 if (c2 && currentCenter) {
                     const d = turf.distance(
                         turf.point([currentCenter.lng, currentCenter.lat]),
@@ -1528,8 +1529,14 @@ async function exportPDF() {
                         { units: 'meters' }
                     );
                     distStr = `  |  ${Math.round(d)} м`;
+                    let az = turf.bearing(
+                        turf.point([currentCenter.lng, currentCenter.lat]),
+                        turf.point([c2.lng, c2.lat])
+                    );
+                    if (az < 0) az += 360;
+                    azStr = `  |  аз: ${Math.round(az)}°`;
                 }
-                p2orList.push({ num: i + 1, raw: inp.value.trim(), distStr });
+                p2orList.push({ num: i + 1, raw: inp.value.trim(), distStr, azStr });
             }
         });
 
@@ -1618,7 +1625,7 @@ async function exportPDF() {
         if (p2orList.length === 0) {
             p2DrawRow('Орієнтири', 'не вказано');
         } else {
-            p2orList.forEach(or => p2DrawRow(`Ор.${or.num}`, or.raw + or.distStr));
+            p2orList.forEach(or => p2DrawRow(`Ор.${or.num}`, or.raw + or.distStr + or.azStr));
         }
 
         pdf.addImage(p2c.toDataURL('image/png'), 'PNG', 0, 0, PW, PH);
