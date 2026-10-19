@@ -402,6 +402,30 @@
             border: 1px solid #1e2a1c; padding: 6px 12px;
             border-radius: 7px; font-size: 12px; cursor: pointer;
         }
+        /* Панель вставки тексту */
+        .paste-panel {
+            background: #1e2a1c;
+            padding: 12px 25px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            width: 100%;
+            max-width: 1000px;
+        }
+        .paste-panel > label { color: #f0e6c5; font-size: 12px; font-weight: bold; display: block; margin-bottom: 8px; }
+        .paste-panel textarea {
+            width: 100%; height: 130px; background: #0f1a0e; border: 2px solid #6a8f6a;
+            color: #c8f0c0; font-family: monospace; font-size: 13px; line-height: 1.4;
+            padding: 10px; border-radius: 8px; resize: vertical;
+        }
+        .paste-btn {
+            margin-top: 8px; width: 100%; background: #2a5fa0; color: #fff;
+            padding: 10px; font-size: 14px;
+        }
+        .paste-btn:hover { background: #3a7fd0; }
+        .paste-msg {
+            margin-top: 8px; font-size: 12px; color: #f0e6c5; min-height: 16px;
+            white-space: pre-line;
+        }
     </style>
 </head>
 <body>
@@ -423,6 +447,14 @@
             <button class="info-btn" id="infoBtn">📖 Інструкція</button>
             <button class="clear-btn" id="clearDataBtn">🗑 Очистити дані програми</button>
         </div>
+    </div>
+
+    <!-- Панель вставки тексту від екіпажу -->
+    <div class="paste-panel">
+        <label>📥 ВСТАВИТИ ТЕКСТ ВІД ЕКІПАЖУ:</label>
+        <textarea id="pasteInput" placeholder="Вставте сюди текст, отриманий від екіпажу (КАРТКА ВОГНЮ ...)"></textarea>
+        <button class="paste-btn" id="pasteBtn" type="button">📥 ЗАПОВНИТИ ПОЛЯ</button>
+        <div class="paste-msg" id="pasteMsg"></div>
     </div>
 
     <!-- Модальне вікно інструкції -->
@@ -474,19 +506,23 @@
                     <p>Натисніть «⚙️ Налаштування реквізитів» → введіть звання та ПІБ командира → збережіть. Ці дані автоматично потраплять у PDF. Якщо не заповнити — у PDF залишаться порожні рядки для підпису вручну.</p>
                 </div>
                 <div class="info-step">
-                    <div class="info-step-num">Крок 2 — Координати</div>
+                    <div class="info-step-num">Крок 2 — Вставка даних від екіпажу (необов'язково)</div>
+                    <p>Вставте текст, отриманий від екіпажу, у поле «Вставити текст від екіпажу» і натисніть «📥 Заповнити поля». Поля заповняться автоматично. Перевірте їх перед побудовою сітки.</p>
+                </div>
+                <div class="info-step">
+                    <div class="info-step-num">Крок 3 — Координати</div>
                     <p>Введіть координати центру позиції. Підтримується формат з крапкою (50.123456, 36.123456) та з комою (50,123456, 36,123456).</p>
                 </div>
                 <div class="info-step">
-                    <div class="info-step-num">Крок 3 — Орієнтири (за потреби)</div>
+                    <div class="info-step-num">Крок 4 — Орієнтири (за потреби)</div>
                     <p>Введіть координати орієнтирів. Програма автоматично розрахує відстань від позиції до кожного орієнтиру.</p>
                 </div>
                 <div class="info-step">
-                    <div class="info-step-num">Крок 4 — Червоні зони (за потреби)</div>
+                    <div class="info-step-num">Крок 5 — Червоні зони (за потреби)</div>
                     <p>Введіть діапазон градусів забороненого сектору, наприклад: 0-30. Можна додати кілька зон.</p>
                 </div>
                 <div class="info-step">
-                    <div class="info-step-num">Крок 5 — Побудова і PDF</div>
+                    <div class="info-step-num">Крок 6 — Побудова і PDF</div>
                     <p>Натисніть «🏹 ПОБУДУВАТИ АЗИМУТНУ СІТКУ» → перевірте результат на карті → натисніть «📄 ЗБЕРЕГТИ PDF».</p>
                 </div>
             </div>
@@ -605,6 +641,7 @@
             <input type="text" id="coordInput" value="" placeholder="Приклад: 50.123456, 36.123456">
         </div>
     </div>
+
     <div class="orientirs-panel">
         <label>🟢 ОРІЄНТИРИ (координати точки):</label>
         <div id="orientirsList">
@@ -708,6 +745,7 @@
     </div>
     <div id="statusMsg"></div>
 
+<!-- ═══════════════ ОСНОВНИЙ СКРИПТ ═══════════════ -->
 <script>
 let mainMap, mainOverlay = null, currentCenter = null;
 
@@ -766,11 +804,7 @@ function getRedZones() {
 }
 
 document.getElementById('addZoneBtn').addEventListener('click', () => {
-    const row = document.createElement('div');
-    row.className = 'zone-row';
-    row.innerHTML = `<input type="text" class="zone-input" placeholder="0-30"><span>градусів</span><button class="zone-remove">✕</button>`;
-    row.querySelector('.zone-remove').addEventListener('click', () => row.remove());
-    document.getElementById('zonesList').appendChild(row);
+    addZoneRow('');
 });
 
 function getOrientirs() {
@@ -784,19 +818,32 @@ function getOrientirs() {
     return list;
 }
 
-document.getElementById('addOrBtn').addEventListener('click', () => {
+// Додає рядок орієнтира з вказаним значенням
+function addOrRow(value) {
     const rows = document.querySelectorAll('.or-row');
     const num = rows.length + 1;
     const row = document.createElement('div');
     row.className = 'or-row';
     row.innerHTML = `<span class="or-label">Ор.${num}</span><input type="text" class="or-input" placeholder="50.136125, 36.123321"><button class="or-remove">✕</button>`;
+    row.querySelector('.or-input').value = value || '';
     row.querySelector('.or-remove').addEventListener('click', () => {
         row.remove();
         // Перенумеровуємо
         document.querySelectorAll('.or-row .or-label').forEach((lbl, i) => { lbl.textContent = `Ор.${i + 1}`; });
     });
     document.getElementById('orientirsList').appendChild(row);
-});
+}
+document.getElementById('addOrBtn').addEventListener('click', () => addOrRow(''));
+
+// Додає рядок червоної зони з вказаним значенням
+function addZoneRow(value) {
+    const row = document.createElement('div');
+    row.className = 'zone-row';
+    row.innerHTML = `<input type="text" class="zone-input" placeholder="0-30"><span>градусів</span><button class="zone-remove">✕</button>`;
+    row.querySelector('.zone-input').value = value || '';
+    row.querySelector('.zone-remove').addEventListener('click', () => row.remove());
+    document.getElementById('zonesList').appendChild(row);
+}
 
 function drawGrid(mapInstance, oldLayer, lat, lng, posName, redZones, orientirs, ranges) {
     if (oldLayer) mapInstance.removeLayer(oldLayer);
@@ -1097,13 +1144,6 @@ async function exportPDF() {
         const SC = 4;
 
         // ── Шапка ──
-        // Макет (блоки поміняно місцями по вертикалі):
-        // Рядок 1: «ЗАТВЕРДЖУЮ» — по центру правої половини
-        // Рядок 2: Командир ___ — по центру правої половини
-        // Рядок 3: риска + (військове звання...) — по центру правої половини
-        // Рядок 4: «___» ___ 20___ р. — по центру правої половини
-        // Рядок 5: КАРТКА ВОГНЮ — по центру
-        // Рядок 6: МВГ/ВГ та назва зброї — по центру
         const hH = 48 * SC;
         const hW = Math.round((PW - M * 2) * SC);
         const hc = document.createElement('canvas'); hc.width = hW; hc.height = hH;
@@ -1137,7 +1177,7 @@ async function exportPDF() {
         const [dy, dm, dd] = dateStr.split('-');
         hx.fillText(`«${dd}» ${ukrainianMonths[parseInt(dm,10)-1]} ${dy} р.`, rightX, 27 * SC);
 
-        // Рядок 5: КАРТКА ВОГНЮ — по центру (з невеликим додатковим відступом від блоку реквізитів)
+        // Рядок 5: КАРТКА ВОГНЮ — по центру
         hx.font = `bold ${6.5 * SC}px Arial`; hx.textAlign = 'center';
         hx.fillText('КАРТКА ВОГНЮ', hW / 2, 36 * SC);
 
@@ -1203,7 +1243,7 @@ async function exportPDF() {
                     pdf.line(ctr.px, ctr.py, e.px, e.py);
                     a += step;
                 }
-                // Межові лінії — темно-бордові, трохи тонші за відповідальний сектор
+                // Межові лінії — темно-бордові
                 pdf.setDrawColor(123, 0, 0); pdf.setLineWidth(0.55);
                 const ef = gp(from, Rpdf); pdf.line(ctr.px, ctr.py, ef.px, ef.py);
                 const et = gp(to, Rpdf);   pdf.line(ctr.px, ctr.py, et.px, et.py);
@@ -1258,7 +1298,7 @@ async function exportPDF() {
 
         // Вертикальна лінія вгору
         pdf.setLineWidth(0.28);
-        pdf.line(cx, cy - 9*s + 9*s, cx, cy - 9*s - 11*s); // від низу до верху
+        pdf.line(cx, cy - 9*s + 9*s, cx, cy - 9*s - 11*s);
 
         // Стрілка
         pdf.line(cx - 6*s, cy - 9*s - 5*s, cx, cy - 9*s - 12*s);
@@ -1289,13 +1329,12 @@ async function exportPDF() {
             const nSC = 8; // px/mm
             const fontSize = 4.5 * nSC;
             const fontStr = `bold ${fontSize}px Arial`;
-            // Вимірюємо точну ширину тексту
             const measureC = document.createElement('canvas');
             const measureCtx = measureC.getContext('2d');
             measureCtx.font = fontStr;
             const textW = measureCtx.measureText(posName).width;
-            const padH = 3 * nSC; // відступ по горизонталі
-            const padV = 2 * nSC; // відступ по вертикалі
+            const padH = 3 * nSC;
+            const padV = 2 * nSC;
             const nW = textW + padH * 2;
             const nH = fontSize + padV * 2;
 
@@ -1310,7 +1349,6 @@ async function exportPDF() {
             nctx.textBaseline = 'middle';
             nctx.fillText(posName, nCanvas.width / 2, nCanvas.height / 2);
 
-            // Розміри в мм для PDF
             const wMm = nCanvas.width / nSC;
             const hMm = nCanvas.height / nSC;
             pdf.addImage(nCanvas.toDataURL('image/png'), 'PNG',
@@ -1380,20 +1418,16 @@ async function exportPDF() {
         fx.fillText('Умовні позначення:', fW / 2, 4.5 * SC);
 
         // Таблиця: 4 колонки (іконка | текст | іконка | текст)
-        // Ширини: 12% | 38% | 12% | 38%
         const tY = 6 * SC, tRH = 10 * SC;
         const col0 = 0, col1 = fW * 0.12, col2 = fW * 0.50, col3 = fW * 0.62;
         fx.strokeStyle = '#000'; fx.lineWidth = 0.4 * SC;
-        // Зовнішній прямокутник
         fx.strokeRect(col0, tY, fW, tRH * 2);
-        // Вертикальні лінії
         fx.beginPath(); fx.moveTo(col1, tY); fx.lineTo(col1, tY + tRH * 2); fx.stroke();
         fx.beginPath(); fx.moveTo(col2, tY); fx.lineTo(col2, tY + tRH * 2); fx.stroke();
         fx.beginPath(); fx.moveTo(col3, tY); fx.lineTo(col3, tY + tRH * 2); fx.stroke();
-        // Горизонтальна лінія
         fx.beginPath(); fx.moveTo(col0, tY + tRH); fx.lineTo(fW, tY + tRH); fx.stroke();
 
-        // Рядок 1, клітинка 1: дашована дуга (дальність поразки)
+        // Рядок 1, клітинка 1: дашована дуга
         fx.save();
         fx.strokeStyle = '#000'; fx.lineWidth = 1.2 * SC;
         fx.setLineDash([2 * SC, 1.2 * SC]);
@@ -1406,20 +1440,15 @@ async function exportPDF() {
         fx.font = `bold ${3.2 * SC}px Arial`; fx.textAlign = 'left'; fx.fillStyle = '#000';
         fx.fillText(`Дальність ураження: ${Rpdf} м`, col1 + 1.5 * SC, tY + tRH / 2 + 1.2 * SC);
 
-        // Рядок 1, клітинка 3: стрілки (відповідальний сектор) ← ↗ форма
+        // Рядок 1, клітинка 3: стрілки (відповідальний сектор)
         fx.save();
         fx.strokeStyle = '#000'; fx.lineWidth = 1.5 * SC;
         const arCx = col2 + (col3 - col2) / 2, arCy = tY + tRH / 2;
         const arW = (col3 - col2) * 0.35;
-        // ліва стрілка вліво-вниз
         fx.beginPath(); fx.moveTo(arCx - arW, arCy - 2 * SC); fx.lineTo(arCx, arCy + 2 * SC); fx.stroke();
-        // права стрілка вправо-вниз
         fx.beginPath(); fx.moveTo(arCx + arW, arCy - 2 * SC); fx.lineTo(arCx, arCy + 2 * SC); fx.stroke();
-        // наконечники стрілок
         fx.fillStyle = '#000';
-        // ліва — стрілка вліво
         fx.beginPath(); fx.moveTo(arCx - arW, arCy - 2 * SC); fx.lineTo(arCx - arW - 2 * SC, arCy - 2 * SC + 1.5 * SC); fx.lineTo(arCx - arW + 1.2 * SC, arCy - 2 * SC - 1.5 * SC); fx.closePath(); fx.fill();
-        // права — стрілка вправо
         fx.beginPath(); fx.moveTo(arCx + arW, arCy - 2 * SC); fx.lineTo(arCx + arW + 2 * SC, arCy - 2 * SC + 1.5 * SC); fx.lineTo(arCx + arW - 1.2 * SC, arCy - 2 * SC - 1.5 * SC); fx.closePath(); fx.fill();
         fx.restore();
 
@@ -1427,7 +1456,7 @@ async function exportPDF() {
         fx.font = `bold ${3.2 * SC}px Arial`; fx.textAlign = 'left'; fx.fillStyle = '#000';
         fx.fillText('Відповідальний сектор', col3 + 1.5 * SC, tY + tRH / 2 + 1.2 * SC);
 
-        // Рядок 2, клітинка 1: суцільна дуга (дальність прямого пострілу)
+        // Рядок 2, клітинка 1: суцільна дуга
         fx.save();
         fx.strokeStyle = '#000'; fx.lineWidth = 1.8 * SC;
         fx.beginPath();
@@ -1498,10 +1527,9 @@ async function exportPDF() {
 
         pdf.addImage(fcanv.toDataURL('image/png'), 'PNG', M, footerY, PW - M * 2, footerMm);
 
-        // ── СТОРІНКА 2: Текстові дані форми (canvas → PNG → PDF) ──────────────────
+        // ── СТОРІНКА 2: Текстові дані форми ──
         pdf.addPage();
 
-        // Збираємо дані
         const p2mvgType = document.getElementById('mvgTypeSelect').value || '';
         const p2mvgVal  = (document.getElementById('mvgInput').value || '').trim();
         const p2posName = (document.getElementById('nameInput').value || '').trim();
@@ -1541,8 +1569,7 @@ async function exportPDF() {
             }
         });
 
-        // Canvas для сторінки 2
-        const p2SC = 4; // пікселів на мм
+        const p2SC = 4;
         const p2W = Math.round(PW * p2SC);
         const p2H = Math.round(PH * p2SC);
         const p2c = document.createElement('canvas');
@@ -1550,14 +1577,13 @@ async function exportPDF() {
         const p2x = p2c.getContext('2d');
         p2x.fillStyle = '#fff'; p2x.fillRect(0, 0, p2W, p2H);
 
-        const lM = 15 * p2SC;  // лівий відступ
-        const rM = (PW - 15) * p2SC; // правий край
-        const colVal = 80 * p2SC;    // X початку значення
-        let cY = 18 * p2SC;          // поточна Y
-        const lnH  = 7  * p2SC;      // висота рядка секції
-        const lnHs = 6  * p2SC;      // висота рядка даних
+        const lM = 15 * p2SC;
+        const rM = (PW - 15) * p2SC;
+        const colVal = 80 * p2SC;
+        let cY = 18 * p2SC;
+        const lnH  = 7  * p2SC;
+        const lnHs = 6  * p2SC;
 
-        // Заголовок
         p2x.font = `bold ${6 * p2SC}px Arial`;
         p2x.fillStyle = '#000';
         p2x.textAlign = 'center';
@@ -1589,14 +1615,12 @@ async function exportPDF() {
             cY += lnHs;
         }
 
-        // ── Екіпаж / Позиція ──
         p2DrawSection('ЕКІПАЖ / ПОЗИЦІЯ');
         p2DrawRow('МВГ/ВГ', p2mvgType);
         p2DrawRow('Назва екіпажу', p2mvgVal);
         p2DrawRow('Назва позиції', p2posName);
         cY += 2 * p2SC;
 
-        // ── Координати ──
         p2DrawSection('КООРДИНАТИ ЦЕНТРУ');
         p2DrawRow('Введено', p2coord);
         if (currentCenter) {
@@ -1605,14 +1629,12 @@ async function exportPDF() {
         }
         cY += 2 * p2SC;
 
-        // ── Зброя ──
         p2DrawSection('ЗБРОЯ / ДАЛЬНОСТІ');
         p2DrawRow('Система', (p2weapName && p2weapName !== '— Обрати зброю —') ? p2weapName : '—');
         p2DrawRow('Дальність ураження', p2destruct + ' м');
         p2DrawRow('Дальність прямого пострілу', p2direct + ' м');
         cY += 2 * p2SC;
 
-        // ── Червоні зони ──
         p2DrawSection('ЗАБОРОНЕНІ СЕКТОРИ (ЧЕРВОНІ ЗОНИ)');
         if (p2zones.length === 0) {
             p2DrawRow('Зони', 'не вказано');
@@ -1621,7 +1643,6 @@ async function exportPDF() {
         }
         cY += 2 * p2SC;
 
-        // ── Орієнтири ──
         p2DrawSection('ОРІЄНТИРИ');
         if (p2orList.length === 0) {
             p2DrawRow('Орієнтири', 'не вказано');
@@ -1922,7 +1943,7 @@ window.addEventListener('offline', updateNetStatus);
 
 // ── Перевірка оновлень ────────────────────────────────────────
 // Версія вшита в код — при кожному оновленні index.html змінюється
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 async function checkForUpdates() {
     if (!navigator.onLine) return;
@@ -1979,6 +2000,198 @@ document.getElementById('updateDismiss').addEventListener('click', () => {
 setTimeout(checkForUpdates, 3000);
 // І кожні 30 хвилин якщо сторінка відкрита довго
 setInterval(checkForUpdates, 30 * 60 * 1000);
+</script>
+
+<!-- ═══════════════ ВСТАВКА ТЕКСТУ ВІД ЕКІПАЖУ ═══════════════
+     Окремий самодостатній скрипт: працює навіть якщо основний скрипт зупинився з помилкою.
+     Не залежить від функцій основного скрипта. -->
+<script>
+(function () {
+    function $(id) { return document.getElementById(id); }
+
+    // Латинські літери, схожі на кириличні (месенджери та клавіатури їх іноді підміняють)
+    var LOOK = { A:'А', a:'а', B:'В', C:'С', c:'с', E:'Е', e:'е', H:'Н', I:'І', i:'і',
+                 K:'К', M:'М', O:'О', o:'о', P:'Р', p:'р', T:'Т', X:'Х', x:'х', y:'у' };
+
+    function normalizeLabel(s) {
+        return s.replace(/[AaBCcEeHIiKMOoPpTXxy]/g, function (ch) { return LOOK[ch] || ch; })
+                .toLowerCase().replace(/\s+/g, ' ').trim();
+    }
+    function cleanLine(s) {
+        return s.replace(/[\u200B-\u200D\uFEFF]/g, '').replace(/\u00A0/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    function setMsg(lines, isError) {
+        var el = $('pasteMsg');
+        el.style.color = isError ? '#ff9a8a' : '#c8f0c0';
+        el.textContent = lines.join('\n');
+    }
+    function parseCoord(str) {
+        var s = String(str).replace(/(\d),(\d)/g, '$1.$2');
+        var m = s.match(/(-?\d+(?:\.\d+)?)\s*[,;\s]\s*(-?\d+(?:\.\d+)?)/);
+        if (!m) return null;
+        var lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+        if (isNaN(lat) || isNaN(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+        return { lat: lat, lng: lng };
+    }
+    function fmt(c) { return c.lat.toFixed(6) + ', ' + c.lng.toFixed(6); }
+
+    function renumberOr() {
+        var labels = document.querySelectorAll('#orientirsList .or-row .or-label');
+        for (var i = 0; i < labels.length; i++) labels[i].textContent = 'Ор.' + (i + 1);
+    }
+    function addOr(value) {
+        var row = document.createElement('div');
+        row.className = 'or-row';
+        row.innerHTML = '<span class="or-label"></span><input type="text" class="or-input" placeholder="50.136125, 36.123321"><button class="or-remove" type="button">✕</button>';
+        row.querySelector('.or-input').value = value || '';
+        row.querySelector('.or-remove').addEventListener('click', function () { row.remove(); renumberOr(); });
+        $('orientirsList').appendChild(row);
+        renumberOr();
+    }
+    function addZone(value) {
+        var row = document.createElement('div');
+        row.className = 'zone-row';
+        row.innerHTML = '<input type="text" class="zone-input" placeholder="0-30"><span>градусів</span><button class="zone-remove" type="button">✕</button>';
+        row.querySelector('.zone-input').value = value || '';
+        row.querySelector('.zone-remove').addEventListener('click', function () { row.remove(); });
+        $('zonesList').appendChild(row);
+    }
+    function fire(el) { el.dispatchEvent(new Event('input', { bubbles: true })); }
+
+    function fill() {
+        try {
+            var raw = $('pasteInput').value;
+            if (!raw || !raw.trim()) { setMsg(['⛔ Поле порожнє. Вставте текст від екіпажу.'], true); return; }
+
+            var lines = raw.split(/\r?\n/).map(cleanLine).filter(function (l) { return l.length > 0; });
+
+            var got = { crew: false, pos: false, center: false, weapon: false, destruct: false, direct: false };
+            var problems = [], unknown = [];
+            var orList = [], zoneList = [];
+            var filled = 0;
+
+            // Спочатку збираємо все, і лише потім змінюємо сторінку
+            var vals = {};
+
+            lines.forEach(function (line) {
+                var idx = line.indexOf(':');
+                if (idx < 0) {
+                    var low = normalizeLabel(line);
+                    if (low === 'картка вогню' || low === 'немає') return;
+                    unknown.push(line);
+                    return;
+                }
+                var label = normalizeLabel(line.slice(0, idx));
+                var value = line.slice(idx + 1).trim();
+                var m;
+
+                if (label === 'картка вогню' || label === 'орієнтири' || label === 'червоні зони') return;
+
+                if (label === 'екіпаж') {
+                    m = value.match(/^(МВГ|ВГ|MBГ|МВГ)?\s*(.*)$/i);
+                    var typeRaw = normalizeLabel(value.split(' ')[0] || '');
+                    var type = (typeRaw === 'вг') ? 'ВГ' : 'МВГ';
+                    var name = (typeRaw === 'вг' || typeRaw === 'мвг') ? value.split(' ').slice(1).join(' ').trim() : value;
+                    vals.mvgType = type; vals.mvgName = name;
+                    got.crew = true; filled++;
+                } else if (label === 'позиція') {
+                    vals.pos = value; got.pos = true; filled++;
+                } else if (label === 'центр') {
+                    var c = parseCoord(value);
+                    if (c) { vals.center = fmt(c); got.center = true; filled++; }
+                    else problems.push('Центр: координати не розпізнано («' + value + '»)');
+                } else if (label === 'зброя') {
+                    vals.weapon = value; got.weapon = true;
+                } else if (label === 'дальність ураження') {
+                    m = value.match(/\d+/);
+                    if (m) { vals.destruct = parseInt(m[0], 10); got.destruct = true; filled++; }
+                    else problems.push('Дальність ураження: немає числа');
+                } else if (label === 'дальність прямого пострілу') {
+                    m = value.match(/\d+/);
+                    if (m) { vals.direct = parseInt(m[0], 10); got.direct = true; filled++; }
+                    else problems.push('Дальність прямого пострілу: немає числа');
+                } else if (/^ор\.?\s*\d+$/.test(label)) {
+                    var oc = parseCoord(value);
+                    if (oc) orList.push(fmt(oc));
+                    else problems.push('«' + line.slice(0, idx) + '»: координати не розпізнано («' + value + '»)');
+                } else if (/^зона\s*\d+$/.test(label)) {
+                    m = value.match(/^(\d{1,3})\s*[-–—]\s*(\d{1,3})/);
+                    if (!m) { problems.push('«' + line.slice(0, idx) + '»: формат має бути від-до («' + value + '»)'); }
+                    else {
+                        var from = parseInt(m[1], 10), to = parseInt(m[2], 10);
+                        if (from > 360 || to > 360) problems.push('«' + line.slice(0, idx) + '»: градуси мають бути 0–360');
+                        else if (from > to) problems.push('«' + line.slice(0, idx) + '»: «від» більше за «до»');
+                        else zoneList.push(from + '-' + to);
+                    }
+                } else {
+                    unknown.push(line);
+                }
+            });
+
+            // ── Застосовуємо до полів ──
+            if (vals.mvgType !== undefined) { $('mvgTypeSelect').value = vals.mvgType; $('mvgInput').value = vals.mvgName; }
+            if (vals.pos !== undefined) $('nameInput').value = vals.pos;
+            if (vals.center !== undefined) {
+                $('coordInput').value = vals.center;
+                $('coordStatus').textContent = vals.center;
+            }
+
+            if (vals.weapon !== undefined) {
+                var wantedL = vals.weapon.replace(/\s+/g, ' ').trim().toLowerCase();
+                var sel = $('weaponSelect'), found = null;
+                for (var i = 0; i < sel.options.length; i++) {
+                    var o = sel.options[i];
+                    if (o.value && o.text.replace(/\s+/g, ' ').trim().toLowerCase() === wantedL) { found = o; break; }
+                }
+                if (found) {
+                    sel.value = found.value;
+                    var parts = found.value.split(',');
+                    $('rangeDestruct').value = parts[0];
+                    $('rangeDirect').value = parts[1];
+                    filled++;
+                } else {
+                    problems.push('Зброя «' + vals.weapon + '» не знайдена у довіднику. Оберіть вручну.');
+                    got.weapon = false;
+                }
+            }
+            // Дальності з тексту мають пріоритет над довідником
+            if (vals.destruct !== undefined) $('rangeDestruct').value = vals.destruct;
+            if (vals.direct !== undefined) $('rangeDirect').value = vals.direct;
+            fire($('rangeDestruct')); fire($('rangeDirect'));
+
+            $('orientirsList').innerHTML = '';
+            if (orList.length) orList.forEach(addOr); else addOr('');
+            $('zonesList').innerHTML = '';
+            if (zoneList.length) zoneList.forEach(addZone); else addZone('');
+
+            // ── Перевірка повноти ──
+            if (!got.crew) problems.push('Немає рядка «Екіпаж:»');
+            if (!got.pos) problems.push('Немає рядка «Позиція:»');
+            if (!got.center) problems.push('Немає коректного рядка «Центр:»');
+            if (!got.weapon) problems.push('Зброя не заповнена');
+            if (!got.destruct) problems.push('Немає «Дальність ураження:»');
+            if (!got.direct) problems.push('Немає «Дальність прямого пострілу:»');
+            if (got.destruct && got.direct && vals.direct >= vals.destruct)
+                problems.push('Дальність прямого пострілу має бути меншою за дальність ураження');
+            if (unknown.length) problems.push('Не розпізнано рядків: ' + unknown.length + ' (наприклад: «' + unknown[0].slice(0, 40) + '»)');
+
+            var summary = ['✅ Заповнено. Орієнтирів: ' + orList.length + ', зон: ' + zoneList.length];
+            if (problems.length) {
+                summary.push('⚠️ Перевірте:');
+                problems.forEach(function (p) { summary.push('• ' + p); });
+                setMsg(summary, true);
+            } else {
+                summary.push('Перевірте дані на екрані, потім натисніть «ПОБУДУВАТИ АЗИМУТНУ СІТКУ».');
+                setMsg(summary, false);
+            }
+        } catch (err) {
+            console.error(err);
+            setMsg(['❌ Помилка під час заповнення: ' + err.message], true);
+        }
+    }
+
+    $('pasteBtn').addEventListener('click', fill);
+})();
 </script>
 </body>
 </html>
