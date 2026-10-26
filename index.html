@@ -1173,7 +1173,7 @@ async function exportPDF() {
         // Рядок 4: дата — правий блок
         const ukrainianMonths = ['січня','лютого','березня','квітня','травня','червня',
                                   'липня','серпня','вересня','жовтня','листопада','грудня'];
-        const dateStr = document.getElementById('cardDateInput').value || new Date().toISOString().slice(0,10);
+        const dateStr = localStorage.getItem('cardDate') || document.getElementById('cardDateInput').value || new Date().toISOString().slice(0,10);
         const [dy, dm, dd] = dateStr.split('-');
         hx.fillText(`«${dd}» ${ukrainianMonths[parseInt(dm,10)-1]} ${dy} р.`, rightX, 27 * SC);
 
@@ -1694,6 +1694,8 @@ function getCardDate() {
     return `${dd}.${m}.${y}`;
 }
 
+loadRequisites();
+
 document.getElementById('settingsBtn').addEventListener('click', () => {
     loadRequisites();
     document.getElementById('modalOverlay').classList.add('open');
@@ -1928,6 +1930,9 @@ document.getElementById('clearDataBtn').addEventListener('click', async () => {
     // Видаляємо реквізити командира з localStorage
     localStorage.removeItem('cmdRank');
     localStorage.removeItem('cmdName');
+    localStorage.removeItem('puRank');
+    localStorage.removeItem('puName');
+    localStorage.removeItem('cardDate');
     msg.push('✅ Реквізити командира видалено');
 
     // Скидаємо сесійні дані
@@ -1943,7 +1948,7 @@ window.addEventListener('offline', updateNetStatus);
 
 // ── Перевірка оновлень ────────────────────────────────────────
 // Версія вшита в код — при кожному оновленні index.html змінюється
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
 
 async function checkForUpdates() {
     if (!navigator.onLine) return;
