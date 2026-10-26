@@ -1948,7 +1948,7 @@ window.addEventListener('offline', updateNetStatus);
 
 // ── Перевірка оновлень ────────────────────────────────────────
 // Версія вшита в код — при кожному оновленні index.html змінюється
-const APP_VERSION = '1.2.2';
+const APP_VERSION = '1.2.1';
 
 async function checkForUpdates() {
     if (!navigator.onLine) return;
@@ -2120,17 +2120,14 @@ setInterval(checkForUpdates, 30 * 60 * 1000);
                     if (oc) orList.push(fmt(oc));
                     else problems.push('«' + line.slice(0, idx) + '»: координати не розпізнано («' + value + '»)');
                 } else if (/^зона\s*\d+$/.test(label)) {
-                    // В одному рядку може бути кілька діапазонів (через пробіл, кому, «;», з «°» чи без)
-                    var zoneLabel = line.slice(0, idx);
-                    var zRe = /(\d{1,3})\s*°?\s*[-–—]\s*(\d{1,3})/g, zm, zFound = 0;
-                    while ((zm = zRe.exec(value)) !== null) {
-                        zFound++;
-                        var from = parseInt(zm[1], 10), to = parseInt(zm[2], 10);
-                        if (from > 360 || to > 360) problems.push('«' + zoneLabel + '»: градуси мають бути 0–360 («' + zm[0] + '»)');
-                        else if (from > to) problems.push('«' + zoneLabel + '»: «від» більше за «до» («' + zm[0] + '»)');
+                    m = value.match(/^(\d{1,3})\s*[-–—]\s*(\d{1,3})/);
+                    if (!m) { problems.push('«' + line.slice(0, idx) + '»: формат має бути від-до («' + value + '»)'); }
+                    else {
+                        var from = parseInt(m[1], 10), to = parseInt(m[2], 10);
+                        if (from > 360 || to > 360) problems.push('«' + line.slice(0, idx) + '»: градуси мають бути 0–360');
+                        else if (from > to) problems.push('«' + line.slice(0, idx) + '»: «від» більше за «до»');
                         else zoneList.push(from + '-' + to);
                     }
-                    if (!zFound) problems.push('«' + zoneLabel + '»: формат має бути від-до («' + value + '»)');
                 } else {
                     unknown.push(line);
                 }
